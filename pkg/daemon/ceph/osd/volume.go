@@ -156,6 +156,8 @@ func updateLVMConfig(context *clusterd.Context, onPVC bool) error {
 		// Only filter blocks in /mnt, when running on PVC we copy the PVC claim path to /mnt
 		// And reject everything else
 		output = bytes.Replace(output, []byte(`# filter = [ "a|.*/|" ]`), []byte(`filter = [ "a|^/mnt/.*|", "r|.*|" ]`), 1)
+		// For nested LV
+		output = bytes.Replace(output, []byte("scan_lvs = 0"), []byte("scan_lvs = 1"), 1)
 	}
 
 	if err = ioutil.WriteFile(lvmConfPath, output, 0644); err != nil {
