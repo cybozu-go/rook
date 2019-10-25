@@ -235,7 +235,7 @@ func prepareOSD(cmd *cobra.Command, args []string) error {
 	var dataDevices []osddaemon.DesiredDevice
 	if osdDataDeviceFilter != "" {
 		if cfg.devices != "" {
-			return fmt.Errorf("Only one of --data-devices and --data-device-filter can be specified.")
+			return fmt.Errorf("only one of --data-devices and --data-device-filter can be specified")
 		}
 
 		dataDevices = []osddaemon.DesiredDevice{

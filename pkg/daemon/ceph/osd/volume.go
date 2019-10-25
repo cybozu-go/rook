@@ -98,7 +98,18 @@ func (a *OsdAgent) initializeBlockPVC(context *clusterd.Context, devices *Device
 		}
 		if device.Data == -1 {
 			logger.Infof("configuring new device %s", name)
-			deviceArg := device.Config.Name
+
+			isLV, err := sys.IsLV(device.Config.Name, context.Executor)
+			if err != nil {
+				return "", fmt.Errorf("failed to check the disk type of %s, err: %v", device.Config.Name, err)
+			}
+
+			var deviceArg string
+			if isLV {
+				deviceArg, err = getLVFromDevicePath(context, device.Config.Name)
+			} else {
+				deviceArg = device.Config.Name
+			}
 			immediateExecuteArgs := append(baseArgs, []string{
 				"--data",
 				deviceArg,
@@ -109,9 +120,13 @@ func (a *OsdAgent) initializeBlockPVC(context *clusterd.Context, devices *Device
 				return "", fmt.Errorf("failed ceph-volume. %+v", err) // fail return here as validation provided by ceph-volume
 			} else {
 				logger.Infof("%v", op)
-				lvpath = getLVPath(op)
-				if lvpath == "" {
-					return "", fmt.Errorf("failed to get lvpath from ceph-volume lvm prepare output")
+				if isLV {
+					lvpath = device.Config.Name
+				} else {
+					lvpath = getLVPath(op)
+					if lvpath == "" {
+						return "", fmt.Errorf("failed to get lvpath from ceph-volume lvm prepare output")
+					}
 				}
 			}
 		} else {
@@ -135,6 +150,20 @@ func getLVPath(op string) string {
 		}
 	}
 	return ""
+}
+
+func getLVFromDevicePath(context *clusterd.Context, devicePath string) (string, error) {
+	devInfo, err := context.Executor.ExecuteCommandWithOutput(true, "",
+		"dmsetup", "info", "-c", "--noheadings", "-o", "name", devicePath)
+	if err != nil {
+		return "", fmt.Errorf("failed dmsetup info. output: %s, err: %v", devInfo, err)
+	}
+	out, err := context.Executor.ExecuteCommandWithOutput(true, "", "dmsetup", "splitname", devInfo, "--noheadings")
+	if err != nil {
+		return "", fmt.Errorf("failed dmsetup splitname %s. err: %v", devInfo, err)
+	}
+	split := strings.Split(out, ":")
+	return fmt.Sprintf("%s/%s", split[0], split[1]), nil
 }
 
 func updateLVMConfig(context *clusterd.Context, onPVC bool) error {
