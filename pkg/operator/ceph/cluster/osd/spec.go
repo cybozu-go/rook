@@ -52,6 +52,7 @@ const (
 	osdMetadataDeviceEnvVarName         = "ROOK_METADATA_DEVICE"
 	pvcBackedOSDVarName                 = "ROOK_PVC_BACKED_OSD"
 	lvPathVarName                       = "ROOK_LV_PATH"
+	lvBackedPVVarName                   = "ROOK_LV_BACKED_PV"
 	topologyAwareEnvVarName             = "ROOK_TOPOLOGY_AWARE"
 	rookBinariesMountPath               = "/rook"
 	rookBinariesVolumeName              = "rook-binaries"
@@ -311,6 +312,7 @@ func (c *Cluster) makeDeployment(osdProps osdProperties, osd OSDInfo) (*apps.Dep
 		volumeMounts = append(volumeMounts, getPvcOSDBridgeMount(osdProps.pvc.ClaimName))
 		envVars = append(envVars, pvcBackedOSDEnvVar("true"))
 		envVars = append(envVars, lvPathEnvVariable(osd.LVPath))
+		envVars = append(envVars, lvBackedPVEnvVar(strconv.FormatBool(osd.LVBackedPV)))
 	}
 
 	privileged := true
@@ -791,6 +793,10 @@ func pvcBackedOSDEnvVar(pvcBacked string) v1.EnvVar {
 
 func lvPathEnvVariable(lvPath string) v1.EnvVar {
 	return v1.EnvVar{Name: lvPathVarName, Value: lvPath}
+}
+
+func lvBackedPVEnvVar(lvBackedPV string) v1.EnvVar {
+	return v1.EnvVar{Name: lvBackedPVVarName, Value: lvBackedPV}
 }
 
 func topologyAwareEnvVar(topologyAware string) v1.EnvVar {
