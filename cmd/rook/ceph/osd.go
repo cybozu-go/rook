@@ -72,8 +72,8 @@ var (
 	osdUUID             string
 	osdIsDevice         bool
 	pvcBackedOSD        bool
-	lvBackedPV          bool
 	lvPath              string
+	lvBackedPV          bool
 )
 
 func addOSDFlags(command *cobra.Command) {
@@ -102,8 +102,8 @@ func addOSDFlags(command *cobra.Command) {
 	osdStartCmd.Flags().StringVar(&osdUUID, "osd-uuid", "", "the osd UUID")
 	osdStartCmd.Flags().StringVar(&osdStoreType, "osd-store-type", "", "whether the osd is bluestore or filestore")
 	osdStartCmd.Flags().BoolVar(&pvcBackedOSD, "pvc-backed-osd", false, "Whether the OSD backing store in PVC or not")
-	osdStartCmd.Flags().BoolVar(&lvBackedPV, "lv-backed-pv", false, "Whether the PV located on LV")
 	osdStartCmd.Flags().StringVar(&lvPath, "lv-path", "", "LV path for the OSD created by ceph volume")
+	osdStartCmd.Flags().BoolVar(&lvBackedPV, "lv-backed-pv", false, "Whether the PV located on LV")
 
 	// add the subcommands to the parent osd command
 	osdCmd.AddCommand(osdConfigCmd,
@@ -237,7 +237,7 @@ func prepareOSD(cmd *cobra.Command, args []string) error {
 	var dataDevices []osddaemon.DesiredDevice
 	if osdDataDeviceFilter != "" {
 		if cfg.devices != "" {
-			return fmt.Errorf("only one of --data-devices and --data-device-filter can be specified")
+			return fmt.Errorf("Only one of --data-devices and --data-device-filter can be specified.")
 		}
 
 		dataDevices = []osddaemon.DesiredDevice{

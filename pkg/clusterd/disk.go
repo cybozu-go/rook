@@ -81,12 +81,7 @@ func PopulateDeviceInfo(d string, executor exec.Executor) (*sys.LocalDisk, error
 	}
 
 	diskType, ok := diskProps["TYPE"]
-	if !ok || (diskType != sys.SSDType &&
-		diskType != sys.CryptType &&
-		diskType != sys.DiskType &&
-		diskType != sys.PartType &&
-		diskType != sys.LinearType &&
-		diskType != sys.LVMType) {
+	if !ok || (diskType != sys.SSDType && diskType != sys.CryptType && diskType != sys.DiskType && diskType != sys.PartType && diskType != sys.LinearType && diskType != sys.LVMType) {
 		if !ok {
 			return nil, errors.New("diskType is empty")
 		} else {

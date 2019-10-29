@@ -94,7 +94,7 @@ func (a *OsdAgent) configureCVDevices(context *clusterd.Context, devices *Device
 		}
 	}
 
-	osds, err = getCephVolumeOSDs(context, a.cluster.Name, a.cluster.FSID, lv, lvBackedPV, lvBackedPV)
+	osds, err = getCephVolumeOSDs(context, a.cluster.Name, a.cluster.FSID, lv, lvBackedPV, lvBackedPV) // skip release if PV is LV
 	return osds, err
 }
 
@@ -109,10 +109,10 @@ func (a *OsdAgent) initializeBlockPVC(context *clusterd.Context, devices *Device
 		}
 		if device.Data == -1 {
 			logger.Infof("configuring new device %s", name)
-
 			var err error
 			var deviceArg string
 			if lvBackedPV {
+				// pass 'vg/lv' to ceph-volume
 				deviceArg, err = getLVFromDevicePath(context, device.Config.Name)
 				if err != nil {
 					return "", fmt.Errorf("failed to get device path from lv. %+v", err)
@@ -120,6 +120,7 @@ func (a *OsdAgent) initializeBlockPVC(context *clusterd.Context, devices *Device
 			} else {
 				deviceArg = device.Config.Name
 			}
+
 			immediateExecuteArgs := append(baseArgs, []string{
 				"--data",
 				deviceArg,
@@ -173,6 +174,9 @@ func getLVFromDevicePath(context *clusterd.Context, devicePath string) (string, 
 		return "", fmt.Errorf("failed dmsetup splitname %s. err: %v", devInfo, err)
 	}
 	split := strings.Split(out, ":")
+	if len(split) < 2 {
+		return "", fmt.Errorf("dmsetup splitname returned unexpected result for %s. output: %s", devInfo, out)
+	}
 	return fmt.Sprintf("%s/%s", split[0], split[1]), nil
 }
 
@@ -195,6 +199,7 @@ func updateLVMConfig(context *clusterd.Context, onPVC, lvBackedPV bool) error {
 		// Only filter blocks in /mnt, when running on PVC we copy the PVC claim path to /mnt
 		// And reject everything else
 		if lvBackedPV {
+			// ceph-volume calls lvs if LV is given, so allow "/dev" here
 			output = bytes.Replace(output, []byte(`# filter = [ "a|.*/|" ]`), []byte(`filter = [ "a|^/mnt/.*|", "a|^/dev/.*|", "r|.*|" ]`), 1)
 		} else {
 			output = bytes.Replace(output, []byte(`# filter = [ "a|.*/|" ]`), []byte(`filter = [ "a|^/mnt/.*|", "r|.*|" ]`), 1)
