@@ -199,7 +199,7 @@ func updateLVMConfig(context *clusterd.Context, onPVC, lvBackedPV bool) error {
 		// Only filter blocks in /mnt, when running on PVC we copy the PVC claim path to /mnt
 		// And reject everything else
 		if lvBackedPV {
-			// ceph-volume calls lvs if LV is given, so allow "/dev" here
+			// ceph-volume calls lvs to locate given "vg/lv", so allow "/dev" here
 			output = bytes.Replace(output, []byte(`# filter = [ "a|.*/|" ]`), []byte(`filter = [ "a|^/mnt/.*|", "a|^/dev/.*|", "r|.*|" ]`), 1)
 		} else {
 			output = bytes.Replace(output, []byte(`# filter = [ "a|.*/|" ]`), []byte(`filter = [ "a|^/mnt/.*|", "r|.*|" ]`), 1)
