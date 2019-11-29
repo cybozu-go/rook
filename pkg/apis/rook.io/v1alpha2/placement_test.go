@@ -22,6 +22,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestPlacement_spec(t *testing.T) {
@@ -34,6 +35,13 @@ nodeAffinity:
         operator: In
         values:
           - bar
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        foo: bar
 tolerations:
   - key: foo
     operator: Exists`)
@@ -61,6 +69,16 @@ tolerations:
 							},
 						},
 					},
+				},
+			},
+		},
+		TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+			{
+				MaxSkew:           1,
+				TopologyKey:       "zone",
+				WhenUnsatisfiable: "DoNotSchedule",
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"foo": "bar"},
 				},
 			},
 		},
