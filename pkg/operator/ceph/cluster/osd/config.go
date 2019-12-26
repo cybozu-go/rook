@@ -31,6 +31,23 @@ key = %s
 `
 )
 
+func (c *Cluster) generateKeyringFromClaimName(claimName string) (string, error) {
+	deploymentName := fmt.Sprintf("rook-ceph-osd-%s", claimName)
+
+	user := fmt.Sprintf("osd.%s", claimName)
+	access := []string{"osd", "allow *", "mon", "allow profile osd"}
+
+	s := keyring.GetSecretStore(c.context, c.Namespace, &c.ownerRef)
+
+	key, err := s.GenerateKey(user, access)
+	if err != nil {
+		return "", err
+	}
+
+	keyring := fmt.Sprintf(keyringTemplate, claimName, key)
+	return keyring, s.CreateOrUpdate(deploymentName, keyring)
+}
+
 func (c *Cluster) generateKeyring(osdID int) (string, error) {
 	deploymentName := fmt.Sprintf(osdAppNameFmt, osdID)
 	osdIDStr := strconv.Itoa(osdID)

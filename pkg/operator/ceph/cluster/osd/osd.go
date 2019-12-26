@@ -303,9 +303,19 @@ func (c *Cluster) startProvisioningOverPVCs(config *provisionConfig) {
 			continue
 		}
 
-		job, err := c.makeJob(osdProps, config)
+		claimName := volume.PersistentVolumeClaimSource.ClaimName
+		// keyring must be generated before deployment creation in order to avoid a race condition resulting
+		// in intermittent failure of first-attempt OSD pods.
+		keyring, err := c.generateKeyringFromClaimName(volume.PersistentVolumeClaimSource.ClaimName)
 		if err != nil {
-			message := fmt.Sprintf("failed to create prepare job for pvc %s: %v", osdProps.crushHostname, err)
+			errMsg := fmt.Sprintf("failed to create keyring for pvc %q, %v", osdProps.crushHostname, err)
+			config.addError(errMsg)
+			continue
+		}
+
+		dp, err := c.makeDeploymentForPVC(osdProps, claimName, config)
+		if err != nil {
+			message := fmt.Sprintf("failed to create deployment for pvc %q: %v", osdProps.crushHostname, err)
 			config.addError(message)
 			status := OrchestrationStatus{Status: OrchestrationStatusCompleted, Message: message, PvcBackedOSD: true}
 			if err := c.updateOSDStatus(osdProps.crushHostname, status); err != nil {
@@ -314,19 +324,51 @@ func (c *Cluster) startProvisioningOverPVCs(config *provisionConfig) {
 			}
 		}
 
-		if !c.runJob(job, osdProps.crushHostname, config, "provision") {
-			status := OrchestrationStatus{
-				Status:       OrchestrationStatusCompleted,
-				Message:      fmt.Sprintf("failed to start osd provisioning on pvc %s", osdProps.crushHostname),
-				PvcBackedOSD: true,
+		createdDeployment, createErr := c.context.Clientset.AppsV1().Deployments(c.Namespace).Create(dp)
+		if createErr != nil {
+			if !kerrors.IsAlreadyExists(createErr) {
+				// we failed to create job, update the orchestration status for this pvc
+				logger.Warningf("failed to create osd deployment for pvc %q, %v", osdProps.pvc.ClaimName, createErr)
+				continue
 			}
-			if err := c.updateOSDStatus(osdProps.crushHostname, status); err != nil {
-				config.addError("failed to update osd %q status. %v", osdProps.crushHostname, err)
+			logger.Infof("deployment for osd %s already exists. updating if needed", claimName)
+			createdDeployment, err = c.context.Clientset.AppsV1().Deployments(c.Namespace).Get(dp.Name, metav1.GetOptions{})
+			if err != nil {
+				logger.Warningf("failed to get existing OSD deployment %q for update. %v", dp.Name, err)
+				continue
 			}
 		}
+
+		err = c.associateKeyring(keyring, createdDeployment)
+		if err != nil {
+			logger.Errorf("failed to associate keyring for pvc %q, %v", osdProps.pvc.ClaimName, err)
+		}
+
+		if createErr != nil && kerrors.IsAlreadyExists(createErr) {
+			// Always invoke ceph version before an upgrade so we are sure to be up-to-date
+			daemon := string(opconfig.OsdType)
+			var cephVersionToUse cephver.CephVersion
+
+			// If this is not a Ceph upgrade there is no need to check the ceph version
+			if c.isUpgrade {
+				currentCephVersion, err := client.LeastUptodateDaemonVersion(c.context, c.clusterInfo.Name, daemon)
+				if err != nil {
+					logger.Warningf("failed to retrieve current ceph %q version. %v", daemon, err)
+					logger.Debug("could not detect ceph version during update, this is likely an initial bootstrap, proceeding with c.clusterInfo.CephVersion")
+					cephVersionToUse = c.clusterInfo.CephVersion
+				} else {
+					logger.Debugf("current cluster version for osds before upgrading is: %+v", currentCephVersion)
+					cephVersionToUse = currentCephVersion
+				}
+			}
+
+			if err = updateDeploymentAndWait(c.context, dp, c.Namespace, daemon, claimName, cephVersionToUse, c.isUpgrade, c.skipUpgradeChecks); err != nil {
+				logger.Errorf("failed to update osd deployment %s. %v", claimName, err)
+			}
+		}
+
 	}
 	logger.Infof("start osds after provisioning is completed, if needed")
-	c.completeProvision(config)
 }
 
 func (c *Cluster) startProvisioningOverNodes(config *provisionConfig) {
