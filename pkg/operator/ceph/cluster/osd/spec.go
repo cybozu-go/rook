@@ -152,7 +152,6 @@ func (c *Cluster) makeDeploymentForPVC(osdProps osdProperties, claimName string,
 	configVolumeMounts := opspec.RookVolumeMounts(provisionConfig.DataPathMap, false)
 	volumes := opspec.PodVolumes(provisionConfig.DataPathMap, c.dataDirHostPath, false)
 	failureDomainValue := osdProps.crushHostname
-	doConfigInit := true // initialize ceph.conf in init container?
 	//doChownDataPath := true    // chown the data path in an init container?
 
 	var dataDir string
@@ -242,6 +241,10 @@ func (c *Cluster) makeDeploymentForPVC(osdProps osdProperties, claimName string,
 		envVars = append(envVars, pvcBackedOSDEnvVar("true"))
 	}
 
+	confName := k8sutil.TruncateNodeName(orchestrationStatusMapName, osdProps.crushHostname)
+	volumes = append(volumes, v1.Volume{Name: confName, VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: confName}}}})
+	volumeMounts = append(volumeMounts, v1.VolumeMount{Name: confName, MountPath: "/etc/rook/status.conf"})
+
 	privileged := true
 	runAsUser := int64(0)
 	readOnlyRootFilesystem := false
@@ -260,17 +263,15 @@ func (c *Cluster) makeDeploymentForPVC(osdProps osdProperties, claimName string,
 	}
 
 	initContainers := make([]v1.Container, 0, 3)
-	if doConfigInit {
-		initContainers = append(initContainers,
-			v1.Container{
-				Args:            []string{"ceph", "osd", "init"},
-				Name:            opspec.ConfigInitContainerName,
-				Image:           k8sutil.MakeRookImage(c.rookVersion),
-				VolumeMounts:    configVolumeMounts,
-				Env:             configEnvVars,
-				SecurityContext: securityContext,
-			})
-	}
+	initContainers = append(initContainers,
+		v1.Container{
+			Args:            []string{"ceph", "osd", "init"},
+			Name:            opspec.ConfigInitContainerName,
+			Image:           k8sutil.MakeRookImage(c.rookVersion),
+			VolumeMounts:    configVolumeMounts,
+			Env:             configEnvVars,
+			SecurityContext: securityContext,
+		})
 	initContainers = append(initContainers, *copyBinariesContainer)
 
 	// Doing a chown in a post start lifecycle hook does not reliably complete before the OSD
