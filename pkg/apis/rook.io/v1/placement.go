@@ -41,6 +41,10 @@ func (p Placement) ApplyToPodSpec(t *v1.PodSpec) {
 	if p.Tolerations != nil {
 		t.Tolerations = p.Tolerations
 	}
+
+	if p.TopologySpreadConstraints != nil {
+		t.TopologySpreadConstraints = p.TopologySpreadConstraints
+	}
 }
 
 // Merge returns a Placement which results from merging the attributes of the
@@ -59,6 +63,9 @@ func (p Placement) Merge(with Placement) Placement {
 	}
 	if with.Tolerations != nil {
 		ret.Tolerations = with.Tolerations
+	}
+	if with.TopologySpreadConstraints != nil {
+		ret.TopologySpreadConstraints = with.TopologySpreadConstraints
 	}
 	return ret
 }
