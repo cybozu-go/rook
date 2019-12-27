@@ -262,7 +262,10 @@ func (c *Cluster) makeDeploymentForPVC(osdProps osdProperties, claimName string,
 		DNSPolicy = v1.DNSClusterFirstWithHostNet
 	}
 
-	initContainers := make([]v1.Container, 0, 3)
+	initContainers := make([]v1.Container, 0, 5)
+	initContainers = append(initContainers, *copyBinariesContainer)
+	initContainers = append(initContainers, c.getPVCInitContainer(osdProps.pvc))
+	initContainers = append(initContainers, c.provisionOSDContainer(osdProps, copyBinariesContainer.VolumeMounts[0], provisionConfig)
 	initContainers = append(initContainers,
 		v1.Container{
 			Args:            []string{"ceph", "osd", "init"},
@@ -272,7 +275,6 @@ func (c *Cluster) makeDeploymentForPVC(osdProps osdProperties, claimName string,
 			Env:             configEnvVars,
 			SecurityContext: securityContext,
 		})
-	initContainers = append(initContainers, *copyBinariesContainer)
 
 	// Doing a chown in a post start lifecycle hook does not reliably complete before the OSD
 	// process starts, which can cause the pod to fail without the lifecycle hook's chown command
@@ -1253,6 +1255,7 @@ func (c *Cluster) getOSDLabelsForPVC(clainName string, failureDomainValue string
 		"ceph-osd-claim-name": clainName,
 		FailureDomainKey:      failureDomainValue,
 		portableKey:           strconv.FormatBool(portable),
+		OSDOverPVCLabelKey:  claimName,
 	}
 }
 
