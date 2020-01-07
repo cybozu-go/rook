@@ -1257,11 +1257,11 @@ func (c *Cluster) getOSDLabels(osdID int, failureDomainValue string, portable bo
 	}
 }
 
-func (c *Cluster) getOSDLabelsForPVC(clainName string, failureDomainValue string, portable bool) map[string]string {
+func (c *Cluster) getOSDLabelsForPVC(claimName string, failureDomainValue string, portable bool) map[string]string {
 	return map[string]string{
 		k8sutil.AppAttr:       AppName,
 		k8sutil.ClusterAttr:   c.Namespace,
-		"ceph-osd-claim-name": clainName,
+		"ceph-osd-claim-name": claimName,
 		FailureDomainKey:      failureDomainValue,
 		portableKey:           strconv.FormatBool(portable),
 		OSDOverPVCLabelKey:    claimName,
