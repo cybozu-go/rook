@@ -17,11 +17,14 @@ limitations under the License.
 package ceph
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
 
+	"github.com/rook/rook/pkg/operator/ceph/cluster/osd"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/pkg/errors"
@@ -76,6 +79,7 @@ var (
 	pvcBackedOSD            bool
 	lvPath                  string
 	lvBackedPV              bool
+	rookStatusFile          string
 )
 
 func addOSDFlags(command *cobra.Command) {
@@ -106,6 +110,7 @@ func addOSDFlags(command *cobra.Command) {
 	osdStartCmd.Flags().BoolVar(&pvcBackedOSD, "pvc-backed-osd", false, "Whether the OSD backing store in PVC or not")
 	osdStartCmd.Flags().StringVar(&lvPath, "lv-path", "", "LV path for the OSD created by ceph volume")
 	osdStartCmd.Flags().BoolVar(&lvBackedPV, "lv-backed-pv", false, "Whether the PV located on LV")
+	osdStartCmd.Flags().StringVar(&rookStatusFile, "rook-status", "", "file name of rook status")
 
 	// add the subcommands to the parent osd command
 	osdCmd.AddCommand(osdConfigCmd,
@@ -145,9 +150,36 @@ func init() {
 
 // Start the osd daemon if provisioned by ceph-volume
 func startOSD(cmd *cobra.Command, args []string) error {
-	required := []string{"osd-id", "osd-uuid", "osd-store-type"}
-	if err := flags.VerifyRequiredFlags(osdStartCmd, required); err != nil {
-		return err
+
+	if rookStatusFile != "" {
+		f, err := os.Open(rookStatusFile)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		statusRaw, err := ioutil.ReadAll(f)
+		if err != nil {
+			return err
+		}
+		var status osd.OrchestrationStatus
+		if err := json.Unmarshal(statusRaw, &status); err != nil {
+			return err
+		}
+		if len(status.OSDs) < 1 {
+			return errors.New("OSDs should not be empty")
+		}
+		osdStringID = fmt.Sprintf("%d", status.OSDs[0].ID)
+		osdUUID = status.OSDs[0].UUID
+
+		required := []string{"osd-store-type"}
+		if err := flags.VerifyRequiredFlags(osdStartCmd, required); err != nil {
+			return err
+		}
+	} else {
+		required := []string{"osd-id", "osd-uuid", "osd-store-type"}
+		if err := flags.VerifyRequiredFlags(osdStartCmd, required); err != nil {
+			return err
+		}
 	}
 
 	commonOSDInit(osdStartCmd)

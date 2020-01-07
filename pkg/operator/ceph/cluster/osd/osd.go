@@ -289,17 +289,6 @@ func (c *Cluster) startProvisioningOverPVCs(config *provisionConfig) {
 
 		if len(osdDeployments.Items) != 0 {
 			logger.Infof("skip OSD prepare pod creation as OSD daemon already exists for %q", osdProps.crushHostname)
-			osds, err := getOSDInfo(&osdDeployments.Items[0])
-			if err != nil {
-				config.addError("failed to get osdInfo for pvc %q. %v", osdProps.crushHostname, err)
-				continue
-			}
-			// update the orchestration status of this pvc to the completed state
-			status = OrchestrationStatus{OSDs: osds, Status: OrchestrationStatusCompleted, PvcBackedOSD: true}
-			if err := c.updateOSDStatus(osdProps.crushHostname, status); err != nil {
-				config.addError("failed to update pvc %q status. %v", osdProps.crushHostname, err)
-				continue
-			}
 			continue
 		}
 

@@ -216,6 +216,7 @@ func (c *Cluster) makeDeploymentForPVC(osdProps osdProperties, claimName string,
 		"--cluster", "ceph",
 		"--setuser", "ceph",
 		"--setgroup", "ceph",
+		"--rook-status", "/etc/rook/status.json",
 	}
 
 	// mount /run/udev in the container so ceph-volume (via `lvs`)
@@ -242,8 +243,16 @@ func (c *Cluster) makeDeploymentForPVC(osdProps osdProperties, claimName string,
 	}
 
 	confName := k8sutil.TruncateNodeName(orchestrationStatusMapName, osdProps.crushHostname)
-	volumes = append(volumes, v1.Volume{Name: confName, VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: confName}}}})
-	volumeMounts = append(volumeMounts, v1.VolumeMount{Name: confName, MountPath: "/etc/rook/status.conf"})
+	volumes = append(volumes, v1.Volume{
+		Name: confName,
+		VolumeSource: v1.VolumeSource{
+			ConfigMap: &v1.ConfigMapVolumeSource{
+				LocalObjectReference: v1.LocalObjectReference{Name: confName},
+				Items:                []v1.KeyToPath{{Key: "status", Path: "status.json"}},
+			},
+		},
+	})
+	volumeMounts = append(volumeMounts, v1.VolumeMount{Name: confName, MountPath: "/etc/rook/"})
 
 	privileged := true
 	runAsUser := int64(0)
@@ -265,7 +274,7 @@ func (c *Cluster) makeDeploymentForPVC(osdProps osdProperties, claimName string,
 	initContainers := make([]v1.Container, 0, 5)
 	initContainers = append(initContainers, *copyBinariesContainer)
 	initContainers = append(initContainers, c.getPVCInitContainer(osdProps.pvc))
-	initContainers = append(initContainers, c.provisionOSDContainer(osdProps, copyBinariesContainer.VolumeMounts[0], provisionConfig)
+	initContainers = append(initContainers, c.provisionOSDContainer(osdProps, copyBinariesContainer.VolumeMounts[0], provisionConfig))
 	initContainers = append(initContainers,
 		v1.Container{
 			Args:            []string{"ceph", "osd", "init"},
@@ -1255,7 +1264,7 @@ func (c *Cluster) getOSDLabelsForPVC(clainName string, failureDomainValue string
 		"ceph-osd-claim-name": clainName,
 		FailureDomainKey:      failureDomainValue,
 		portableKey:           strconv.FormatBool(portable),
-		OSDOverPVCLabelKey:  claimName,
+		OSDOverPVCLabelKey:    claimName,
 	}
 }
 
