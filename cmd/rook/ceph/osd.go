@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -35,6 +36,7 @@ import (
 	"github.com/rook/rook/pkg/operator/ceph/cluster/mon"
 	oposd "github.com/rook/rook/pkg/operator/ceph/cluster/osd"
 	osdcfg "github.com/rook/rook/pkg/operator/ceph/cluster/osd/config"
+	cephcfg "github.com/rook/rook/pkg/operator/ceph/config"
 	"github.com/rook/rook/pkg/operator/k8sutil"
 	"github.com/rook/rook/pkg/util/flags"
 	"github.com/spf13/cobra"
@@ -174,6 +176,12 @@ func startOSD(cmd *cobra.Command, args []string) error {
 		required := []string{"osd-store-type"}
 		if err := flags.VerifyRequiredFlags(osdStartCmd, required); err != nil {
 			return err
+		}
+
+		//TODO: implement chownCephDataDirInitContainer in Golang
+		out, err := exec.Command("chown", "--verbose", "--recursive", "ceph:ceph", cephcfg.VarLogCephDir, cephcfg.VarLibCephCrashDir, status.OSDs[0].DataPath).Output()
+		if err != nil {
+			return fmt.Errorf("failed to chown: %s, %s", err.Error(), string(out))
 		}
 	} else {
 		required := []string{"osd-id", "osd-uuid", "osd-store-type"}
