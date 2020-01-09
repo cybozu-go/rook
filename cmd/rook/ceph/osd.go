@@ -171,18 +171,24 @@ func startOSD(cmd *cobra.Command, args []string) error {
 		if len(status.OSDs) < 1 {
 			return errors.New("OSDs should not be empty")
 		}
-		osdStringID = fmt.Sprintf("%d", status.OSDs[0].ID)
-		osdUUID = status.OSDs[0].UUID
-		lvBackedPV = status.OSDs[0].LVBackedPV
-		lvPath = status.OSDs[0].LVPath
+		osdInfo := status.OSDs[0]
+		osdStringID = fmt.Sprintf("%d", osdInfo.ID)
+		osdUUID = osdInfo.UUID
+		lvBackedPV = osdInfo.LVBackedPV
+		lvPath = osdInfo.LVPath
 
 		required := []string{"osd-store-type"}
 		if err := flags.VerifyRequiredFlags(osdStartCmd, required); err != nil {
 			return err
 		}
+		args = append(args,
+			"--id", osdStringID,
+			"--setuser-match-path", osdInfo.DataPath,
+			fmt.Sprintf("--crush-location=%s", osdInfo.Location),
+		)
 
 		//TODO: implement chownCephDataDirInitContainer in Golang
-		out, err := exec.Command("chown", "--verbose", "--recursive", "ceph:ceph", cephcfg.VarLogCephDir, cephcfg.VarLibCephCrashDir, status.OSDs[0].DataPath).Output()
+		out, err := exec.Command("chown", "--verbose", "--recursive", "ceph:ceph", cephcfg.VarLogCephDir, cephcfg.VarLibCephCrashDir, osdInfo.DataPath).Output()
 		if err != nil {
 			//return fmt.Errorf("failed to chown: %s, %s", err.Error(), string(out))
 			logger.Warningf("failed to chown: %s, %s", err.Error(), string(out))
