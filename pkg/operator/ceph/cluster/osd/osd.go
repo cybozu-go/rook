@@ -41,6 +41,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
+	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -312,6 +313,9 @@ func (c *Cluster) startProvisioningOverPVCs(config *provisionConfig) {
 				continue
 			}
 		}
+		//TODO: remove debug codes
+		out, _ := yaml.Marshal(dp)
+		logger.Infof("creating a deployment: \n---\n%s\n", string(out))
 
 		createdDeployment, createErr := c.context.Clientset.AppsV1().Deployments(c.Namespace).Create(dp)
 		if createErr != nil {

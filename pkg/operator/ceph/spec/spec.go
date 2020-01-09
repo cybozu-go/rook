@@ -89,6 +89,11 @@ func confGeneratedInPodVolumeAndMount() (v1.Volume, v1.VolumeMount) {
 	return v, m
 }
 
+func ConfigVolume() v1.Volume {
+	vol, _ := confGeneratedInPodVolumeAndMount()
+	return vol
+}
+
 // PodVolumes fills in the volumes parameter with the common list of Kubernetes volumes for use in Ceph pods.
 // This function is only used for OSDs.
 func PodVolumes(dataPaths *config.DataPathMap, dataDirHostPath string, confGeneratedInPod bool) []v1.Volume {

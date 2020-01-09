@@ -151,6 +151,7 @@ func (c *Cluster) makeDeploymentForPVC(osdProps osdProperties, claimName string,
 	volumeMounts := opspec.CephVolumeMounts(provisionConfig.DataPathMap, false)
 	configVolumeMounts := opspec.RookVolumeMounts(provisionConfig.DataPathMap, false)
 	volumes := opspec.PodVolumes(provisionConfig.DataPathMap, c.dataDirHostPath, false)
+	volumes = append(volumes, opspec.ConfigVolume())
 	failureDomainValue := osdProps.crushHostname
 	//doChownDataPath := true    // chown the data path in an init container?
 
@@ -210,13 +211,13 @@ func (c *Cluster) makeDeploymentForPVC(osdProps osdProperties, claimName string,
 	args = []string{
 		"--", path.Join(rookBinariesMountPath, "rook"),
 		"ceph", "osd", "start",
+		"--rook-status", "/etc/rook/status.json",
 		"--",
 		"--foreground",
 		"--fsid", c.clusterInfo.FSID,
 		"--cluster", "ceph",
 		"--setuser", "ceph",
 		"--setgroup", "ceph",
-		"--rook-status", "/etc/rook/status.json",
 	}
 
 	// mount /run/udev in the container so ceph-volume (via `lvs`)
@@ -253,6 +254,7 @@ func (c *Cluster) makeDeploymentForPVC(osdProps osdProperties, claimName string,
 		},
 	})
 	volumeMounts = append(volumeMounts, v1.VolumeMount{Name: confName, MountPath: "/etc/rook/"})
+	configVolumeMounts = append(configVolumeMounts, v1.VolumeMount{Name: confName, MountPath: "/etc/rook/"})
 
 	privileged := true
 	runAsUser := int64(0)
@@ -277,9 +279,10 @@ func (c *Cluster) makeDeploymentForPVC(osdProps osdProperties, claimName string,
 	initContainers = append(initContainers, c.provisionOSDContainer(osdProps, copyBinariesContainer.VolumeMounts[0], provisionConfig))
 	initContainers = append(initContainers,
 		v1.Container{
-			Args:            []string{"ceph", "osd", "init"},
+			Args:            []string{"ceph", "osd", "init", "--rook-status", "/etc/rook/status.json"},
 			Name:            opspec.ConfigInitContainerName,
 			Image:           k8sutil.MakeRookImage(c.rookVersion),
+			ImagePullPolicy: v1.PullAlways,
 			VolumeMounts:    configVolumeMounts,
 			Env:             configEnvVars,
 			SecurityContext: securityContext,
@@ -341,6 +344,7 @@ func (c *Cluster) makeDeploymentForPVC(osdProps osdProperties, claimName string,
 							Args:            args,
 							Name:            "osd",
 							Image:           c.cephVersion.Image,
+							ImagePullPolicy: v1.PullAlways,
 							VolumeMounts:    volumeMounts,
 							Env:             envVars,
 							Resources:       osdProps.resources,
@@ -353,12 +357,9 @@ func (c *Cluster) makeDeploymentForPVC(osdProps osdProperties, claimName string,
 			Replicas: &replicaCount,
 		},
 	}
-	deployment.Spec.Template.Spec.InitContainers = append(deployment.Spec.Template.Spec.InitContainers, c.getPVCInitContainer(osdProps.pvc))
+	//deployment.Spec.Template.Spec.InitContainers = append(deployment.Spec.Template.Spec.InitContainers, c.getPVCInitContainer(osdProps.pvc))
 	k8sutil.AddLabelToDeployement(OSDOverPVCLabelKey, osdProps.pvc.ClaimName, deployment)
 	k8sutil.AddLabelToPod(OSDOverPVCLabelKey, osdProps.pvc.ClaimName, &deployment.Spec.Template)
-	if !osdProps.portable {
-		deployment.Spec.Template.Spec.NodeSelector = map[string]string{v1.LabelHostname: osdProps.crushHostname}
-	}
 	// Replace default unreachable node toleration if the osd pod is portable and based in PVC
 	if osdProps.pvc.ClaimName != "" && osdProps.portable {
 		k8sutil.AddUnreachableNodeToleration(&deployment.Spec.Template.Spec)
@@ -789,9 +790,10 @@ func (c *Cluster) getCopyBinariesContainer() (v1.Volume, *v1.Container) {
 		Args: []string{
 			"copy-binaries",
 			"--copy-to-dir", rookBinariesMountPath},
-		Name:         "copy-bins",
-		Image:        k8sutil.MakeRookImage(c.rookVersion),
-		VolumeMounts: []v1.VolumeMount{mount},
+		Name:            "copy-bins",
+		Image:           k8sutil.MakeRookImage(c.rookVersion),
+		ImagePullPolicy: v1.PullAlways,
+		VolumeMounts:    []v1.VolumeMount{mount},
 	}
 }
 
@@ -921,8 +923,9 @@ func (c *Cluster) provisionPodTemplateSpec(osdProps osdProperties, restart v1.Re
 // and the privileged provision container.
 func (c *Cluster) getPVCInitContainer(pvc v1.PersistentVolumeClaimVolumeSource) v1.Container {
 	return v1.Container{
-		Name:  blockPVCMapperInitContainer,
-		Image: c.cephVersion.Image,
+		Name:            blockPVCMapperInitContainer,
+		Image:           c.cephVersion.Image,
+		ImagePullPolicy: v1.PullAlways,
 		Command: []string{
 			"cp",
 		},
@@ -1059,7 +1062,7 @@ func (c *Cluster) provisionOSDContainer(osdProps osdProperties, copyBinariesMoun
 	if devMountNeeded {
 		devMount := v1.VolumeMount{Name: "devices", MountPath: "/dev"}
 		volumeMounts = append(volumeMounts, devMount)
-		udevMount := v1.VolumeMount{Name: "udev", MountPath: "/run/udev"}
+		udevMount := v1.VolumeMount{Name: "run-udev", MountPath: "/run/udev"}
 		volumeMounts = append(volumeMounts, udevMount)
 	}
 
@@ -1093,12 +1096,13 @@ func (c *Cluster) provisionOSDContainer(osdProps osdProperties, copyBinariesMoun
 	readOnlyRootFilesystem := false
 
 	osdProvisionContainer := v1.Container{
-		Command:      []string{path.Join(rookBinariesMountPath, "tini")},
-		Args:         []string{"--", path.Join(rookBinariesMountPath, "rook"), "ceph", "osd", "provision"},
-		Name:         "provision",
-		Image:        c.cephVersion.Image,
-		VolumeMounts: volumeMounts,
-		Env:          envVars,
+		Command:         []string{path.Join(rookBinariesMountPath, "tini")},
+		Args:            []string{"--", path.Join(rookBinariesMountPath, "rook"), "ceph", "osd", "provision"},
+		Name:            "provision",
+		Image:           c.cephVersion.Image,
+		ImagePullPolicy: v1.PullAlways,
+		VolumeMounts:    volumeMounts,
+		Env:             envVars,
 		SecurityContext: &v1.SecurityContext{
 			Privileged:             &privileged,
 			RunAsUser:              &runAsUser,

@@ -100,6 +100,7 @@ func addOSDFlags(command *cobra.Command) {
 	// flags for generating the osd config
 	osdConfigCmd.Flags().IntVar(&osdID, "osd-id", -1, "osd id for which to generate config")
 	osdConfigCmd.Flags().BoolVar(&osdIsDevice, "is-device", false, "whether the osd is a device")
+	osdConfigCmd.Flags().StringVar(&rookStatusFile, "rook-status", "", "file name of rook status")
 
 	// flags for running filestore on a device
 	filestoreDeviceCmd.Flags().StringVar(&mountSourcePath, "source-path", "", "the source path of the device to mount")
@@ -172,6 +173,8 @@ func startOSD(cmd *cobra.Command, args []string) error {
 		}
 		osdStringID = fmt.Sprintf("%d", status.OSDs[0].ID)
 		osdUUID = status.OSDs[0].UUID
+		lvBackedPV = status.OSDs[0].LVBackedPV
+		lvPath = status.OSDs[0].LVPath
 
 		required := []string{"osd-store-type"}
 		if err := flags.VerifyRequiredFlags(osdStartCmd, required); err != nil {
@@ -181,7 +184,8 @@ func startOSD(cmd *cobra.Command, args []string) error {
 		//TODO: implement chownCephDataDirInitContainer in Golang
 		out, err := exec.Command("chown", "--verbose", "--recursive", "ceph:ceph", cephcfg.VarLogCephDir, cephcfg.VarLibCephCrashDir, status.OSDs[0].DataPath).Output()
 		if err != nil {
-			return fmt.Errorf("failed to chown: %s, %s", err.Error(), string(out))
+			//return fmt.Errorf("failed to chown: %s, %s", err.Error(), string(out))
+			logger.Warningf("failed to chown: %s, %s", err.Error(), string(out))
 		}
 	} else {
 		required := []string{"osd-id", "osd-uuid", "osd-store-type"}
@@ -239,6 +243,25 @@ func verifyConfigFlags(configCmd *cobra.Command) error {
 func writeOSDConfig(cmd *cobra.Command, args []string) error {
 	if err := verifyConfigFlags(osdConfigCmd); err != nil {
 		return err
+	}
+	if rookStatusFile != "" {
+		f, err := os.Open(rookStatusFile)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		statusRaw, err := ioutil.ReadAll(f)
+		if err != nil {
+			return err
+		}
+		var status osd.OrchestrationStatus
+		if err := json.Unmarshal(statusRaw, &status); err != nil {
+			return err
+		}
+		if len(status.OSDs) < 1 {
+			return errors.New("OSDs should not be empty")
+		}
+		osdID = status.OSDs[0].ID
 	}
 	if osdID == -1 {
 		return errors.New("osd id not specified")
