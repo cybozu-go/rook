@@ -19,6 +19,7 @@ package clusterd
 import (
 	"errors"
 	"fmt"
+	"path"
 	"regexp"
 	"strconv"
 
@@ -148,6 +149,9 @@ func PopulateDeviceInfo(d string, executor exec.Executor) (*sys.LocalDisk, error
 	}
 	if val, ok := diskProps["NAME"]; ok {
 		disk.RealName = val
+	}
+	if val, ok := diskProps["KNAME"]; ok {
+		disk.KernelName = path.Base(val)
 	}
 
 	return disk, nil
