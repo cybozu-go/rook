@@ -202,7 +202,7 @@ func GetDeviceProperties(device string, executor exec.Executor) (map[string]stri
 func GetDevicePropertiesFromPath(devicePath string, executor exec.Executor) (map[string]string, error) {
 	cmd := fmt.Sprintf("lsblk %s", devicePath)
 	output, err := executor.ExecuteCommandWithOutput(false, cmd, "lsblk", devicePath,
-		"--bytes", "--nodeps", "--pairs", "--output", "SIZE,ROTA,RO,TYPE,PKNAME,NAME")
+		"--bytes", "--nodeps", "--pairs", "--path", "--output", "SIZE,ROTA,RO,TYPE,PKNAME,NAME")
 	if err != nil {
 		// The "not a block device" error also returns code 32 so the ExitStatus() check hides this error
 		if strings.Contains(output, "not a block device") {
@@ -376,6 +376,9 @@ func isDeviceAvailable(executor exec.Executor, device string) (bool, string, err
 func inventoryDevice(executor exec.Executor, dev string) (CephVolumeInventory, error) {
 	var CVInventory CephVolumeInventory
 	device := path.Join("/dev", dev)
+	if strings.Contains(dev, "/") {
+		device = dev
+	}
 
 	args := []string{"inventory", "--format", "json", device}
 	inventory, err := executor.ExecuteCommandWithOutput(false, "", "ceph-volume", args...)
