@@ -150,6 +150,9 @@ func PopulateDeviceInfo(d string, executor exec.Executor) (*sys.LocalDisk, error
 	if val, ok := diskProps["NAME"]; ok {
 		disk.RealPath = val
 	}
+	if val, ok := diskProps["KNAME"]; ok {
+		disk.KernelName = path.Base(val)
+	}
 
 	return disk, nil
 }
