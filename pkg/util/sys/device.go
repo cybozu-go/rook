@@ -106,6 +106,8 @@ type LocalDisk struct {
 	CephVolumeData string `json:"cephVolumeData,omitempty"`
 	// RealName is the device behind the PVC, behind /mnt/<pvc>/name
 	RealName string `json:"real-name,omitempty"`
+	// KernelName is the kernel name of the device
+	KernelName string `json:"kernel-name,omitempty"`
 }
 
 // ListDevices list all devices available on a machine
@@ -202,7 +204,7 @@ func GetDeviceProperties(device string, executor exec.Executor) (map[string]stri
 func GetDevicePropertiesFromPath(devicePath string, executor exec.Executor) (map[string]string, error) {
 	cmd := fmt.Sprintf("lsblk %s", devicePath)
 	output, err := executor.ExecuteCommandWithOutput(false, cmd, "lsblk", devicePath,
-		"--bytes", "--nodeps", "--pairs", "--path", "--output", "SIZE,ROTA,RO,TYPE,PKNAME,NAME")
+		"--bytes", "--nodeps", "--pairs", "--paths", "--output", "SIZE,ROTA,RO,TYPE,PKNAME,NAME,KNAME")
 	if err != nil {
 		// The "not a block device" error also returns code 32 so the ExitStatus() check hides this error
 		if strings.Contains(output, "not a block device") {
