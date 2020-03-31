@@ -327,21 +327,14 @@ func getAvailableDevices(context *clusterd.Context, desiredDevices []DesiredDevi
 		// device.Name can be 'xvdca', later this is formated to '/dev/xvdca'
 		isAvailable, rejectedReason, err := sys.CheckIfDeviceAvailable(context.Executor, device.RealPath, pvcBacked)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to check LV or not %q", device.Name)
+			return nil, errors.Wrapf(err, "failed to get device %q info", device.Name)
 		}
 
-		if !isLV {
-			isAvailable, rejectedReason, err := sys.CheckIfDeviceAvailable(context.Executor, deviceToCheck, pvcBacked)
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to get device %q info", device.Name)
-			}
-
-			if !isAvailable {
-				logger.Infof("skipping device %q: %s.", device.Name, rejectedReason)
-				continue
-			} else {
-				logger.Infof("device %q is available.", device.Name)
-			}
+		if !isAvailable {
+			logger.Infof("skipping device %q: %s.", device.Name, rejectedReason)
+			continue
+		} else {
+			logger.Infof("device %q is available.", device.Name)
 		}
 
 		var deviceInfo *DeviceOsdIDEntry
