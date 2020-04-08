@@ -35,13 +35,6 @@ nodeAffinity:
         operator: In
         values:
           - bar
-topologySpreadConstraints:
-  - maxSkew: 1
-    topologyKey: zone
-    whenUnsatisfiable: DoNotSchedule
-    labelSelector:
-      matchLabels:
-        foo: bar
 tolerations:
   - key: foo
     operator: Exists
@@ -75,16 +68,6 @@ topologySpreadConstraints:
 							},
 						},
 					},
-				},
-			},
-		},
-		TopologySpreadConstraints: []v1.TopologySpreadConstraint{
-			{
-				MaxSkew:           1,
-				TopologyKey:       "zone",
-				WhenUnsatisfiable: "DoNotSchedule",
-				LabelSelector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"foo": "bar"},
 				},
 			},
 		},
@@ -140,12 +123,7 @@ func TestPlacementApplyToPodSpec(t *testing.T) {
 		otherAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution...)
 	assert.Equal(t, 1, len(antiaffinity.PreferredDuringSchedulingIgnoredDuringExecution))
 
-	// partial updates
-	p = Placement{NodeAffinity: na, PodAntiAffinity: antiaffinity, Tolerations: to}
-	ps = &v1.PodSpec{TopologySpreadConstraints: tc}
-	p.ApplyToPodSpec(ps)
-	assert.Equal(t, expected, ps)
-
+	// partial update
 	p = Placement{NodeAffinity: na, PodAntiAffinity: antiaffinity}
 	ps = &v1.PodSpec{Tolerations: to, TopologySpreadConstraints: tc}
 	p.ApplyToPodSpec(ps)
@@ -185,16 +163,8 @@ func TestPlacementMerge(t *testing.T) {
 	var original, with, expected, merged Placement
 
 	original = Placement{}
-	with = Placement{
-		NodeAffinity:              na,
-		Tolerations:               to,
-		TopologySpreadConstraints: tc,
-	}
-	expected = Placement{
-		NodeAffinity:              na,
-		Tolerations:               to,
-		TopologySpreadConstraints: tc,
-	}
+	with = Placement{Tolerations: to}
+	expected = Placement{Tolerations: to}
 	merged = original.Merge(with)
 	assert.Equal(t, expected, merged)
 
@@ -267,19 +237,6 @@ func placementAntiAffinity(value string) *v1.PodAntiAffinity {
 					},
 					TopologyKey: v1.LabelHostname,
 				},
-			},
-		},
-	}
-}
-
-func placementTestGetTopologySpreadConstraints(topologyKey string) []v1.TopologySpreadConstraint {
-	return []v1.TopologySpreadConstraint{
-		{
-			MaxSkew:           1,
-			TopologyKey:       topologyKey,
-			WhenUnsatisfiable: "DoNotSchedule",
-			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"foo": "bar"},
 			},
 		},
 	}
