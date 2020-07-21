@@ -232,6 +232,7 @@ func (c *Cluster) makeDeployment(osdProps osdProperties, osd OSDInfo, provisionC
 		{Name: "ROOK_CEPH_VERSION", Value: c.clusterInfo.CephVersion.CephVersionFormatted()},
 		{Name: "ROOK_IS_DEVICE", Value: "true"},
 	}...)
+	envVars = append(envVars, v1.EnvVar{Name: "ROOK_LOG_LEVEL", Value: c.context.LogLevel.String()})
 
 	// If the OSD runs on PVC
 	if osdProps.onPVC() {
