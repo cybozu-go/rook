@@ -28,7 +28,8 @@ import (
 )
 
 const (
-	localPathPVCmd = "tests/scripts/localPathPV.sh"
+	localPathPVForMonCmd = "tests/scripts/localPathPVForMon.sh"
+	localPathPVForOSDCmd = "tests/scripts/localPathPVForOSD.sh"
 )
 
 // *************************************************************
@@ -65,8 +66,11 @@ type OSDOnPVCSuite struct {
 
 // createPVC creates a PVC for a OSD.
 func (suite *OSDOnPVCSuite) createPVC() {
-	cmdArgs := utils.CommandArgs{Command: localPathPVCmd, CmdArgs: []string{installer.TestScratchDevice()}}
+	cmdArgs := utils.CommandArgs{Command: localPathPVForMonCmd, CmdArgs: []string{}}
 	cmdOut := utils.ExecuteCommand(cmdArgs)
+	require.NoError(suite.T(), cmdOut.Err)
+	cmdArgs = utils.CommandArgs{Command: localPathPVForOSDCmd, CmdArgs: []string{installer.TestScratchDevice()}}
+	cmdOut = utils.ExecuteCommand(cmdArgs)
 	require.NoError(suite.T(), cmdOut.Err)
 }
 
