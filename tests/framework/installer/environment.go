@@ -61,6 +61,11 @@ func TestScratchDevice() string {
 	return getEnvVarWithDefault("TEST_SCRATCH_DEVICE", "/dev/xvdc")
 }
 
+// KubeVersion get the version of Kubernetes
+func KubeVersion() string {
+	return getEnvVarWithDefault("KUBE_VERSION", "1.13.1")
+}
+
 func getEnvVarWithDefault(env, defaultValue string) string {
 	val := os.Getenv(env)
 	if val == "" {
