@@ -19,6 +19,7 @@ package integration
 import (
 	"testing"
 
+	"github.com/rook/rook/pkg/util/sys"
 	"github.com/rook/rook/tests/framework/clients"
 	"github.com/rook/rook/tests/framework/installer"
 	"github.com/rook/rook/tests/framework/utils"
@@ -69,7 +70,8 @@ func (suite *OSDOnPVCSuite) createPVC() {
 	cmdArgs := utils.CommandArgs{Command: localPathPVForMonCmd, CmdArgs: []string{}}
 	cmdOut := utils.ExecuteCommand(cmdArgs)
 	require.NoError(suite.T(), cmdOut.Err)
-	cmdArgs = utils.CommandArgs{Command: localPathPVForOSDCmd, CmdArgs: []string{installer.TestScratchDevice()}}
+	cmdArgs = utils.CommandArgs{Command: localPathPVForOSDCmd,
+		CmdArgs: []string{installer.TestScratchDevice(), sys.DiskType, "create"}}
 	cmdOut = utils.ExecuteCommand(cmdArgs)
 	require.NoError(suite.T(), cmdOut.Err)
 }
@@ -104,8 +106,47 @@ func (suite *OSDOnPVCSuite) TearDownSuite() {
 	suite.op.Teardown()
 }
 
+func (suite *OSDOnPVCSuite) createOSD(deviceType string) {
+	cmdArgs := utils.CommandArgs{Command: localPathPVForOSDCmd,
+		CmdArgs: []string{installer.TestScratchDevice(), deviceType, "create"}}
+	cmdOut := utils.ExecuteCommand(cmdArgs)
+	require.NoError(suite.T(), cmdOut.Err)
+
+	_, err := suite.k8sh.Kubectl("-n", suite.namespace, "patch",
+		"CephCluster", suite.op.installer.ClusterName,
+		"--type=json", "-p", `[{"op": "replace", "path": "/spec/storage/storageClassDeviceSets/0/count", "value":1}]`)
+	require.NoError(suite.T(), err)
+	err = suite.k8sh.WaitForPodCount("app=rook-ceph-osd", suite.namespace, 1)
+	require.Nil(suite.T(), err)
+}
+
+func (suite *OSDOnPVCSuite) deleteOSD(deviceType string) {
+	_, err := suite.k8sh.Kubectl("-n", suite.namespace, "patch", "CephCluster", suite.op.installer.ClusterName,
+		"--type=json", "-p", `[{"op": "replace", "path": "/spec/storage/storageClassDeviceSets/0/count", "value":0}]`)
+	require.NoError(suite.T(), err)
+	err = suite.k8sh.WaitForPodCount("app=rook-ceph-osd", suite.namespace, 0)
+	require.Nil(suite.T(), err)
+	_, err = suite.k8sh.Exec(suite.namespace, "rook-ceph-tools", "ceph", []string{"osd", "down", "osd.0"})
+	require.Nil(suite.T(), err)
+	_, err = suite.k8sh.Exec(suite.namespace, "rook-ceph-tools", "ceph", []string{"osd", "out", "osd.0"})
+	require.Nil(suite.T(), err)
+	_, err = suite.k8sh.Exec(suite.namespace, "rook-ceph-tools", "ceph", []string{"osd", "purge", "0", "--yes-i-really-mean-it"})
+	require.Nil(suite.T(), err)
+	_, err = suite.k8sh.Kubectl("-n", suite.namespace, "delete", "job", "-l", "app=rook-ceph-osd-prepare")
+	require.Nil(suite.T(), err)
+	_, err = suite.k8sh.Kubectl("-n", suite.namespace, "delete", "deployments", "rook-ceph-osd-0")
+	require.Nil(suite.T(), err)
+	_, err = suite.k8sh.Kubectl("-n", suite.namespace, "delete", "pvc", "-l", "ceph.rook.io/DeviceSet=set1")
+	require.Nil(suite.T(), err)
+	cmdArgs := utils.CommandArgs{Command: localPathPVForOSDCmd,
+		CmdArgs: []string{installer.TestScratchDevice(), sys.DiskType, "delete"}}
+	cmdOut := utils.ExecuteCommand(cmdArgs)
+	require.NoError(suite.T(), cmdOut.Err)
+}
+
 // Test to make sure OSD on PVC works correctly
-func (suite *OSDOnPVCSuite) TestCreatingOSDOnPVC() {
-	// Check if a Rook cluster is deployed successfully
+func (suite *OSDOnPVCSuite) TestCreatingOSDConfigurationOnPVC() {
+	// We have an OSD on raw-disk-backed PVC here
+	logger.Infof("Check if OSD on PVC backed by %q type device", sys.DiskType)
 	checkIfRookClusterIsInstalled(suite.Suite, suite.k8sh, installer.SystemNamespace(suite.namespace), suite.namespace, 1)
 }

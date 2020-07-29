@@ -67,7 +67,7 @@ type CephInstaller struct {
 	hostPathToDelete string
 	helmHelper       *utils.HelmHelper
 	useHelm          bool
-	clusterName      string
+	ClusterName      string
 	k8sVersion       string
 	changeHostnames  bool
 	CephVersion      cephv1.CephVersionSpec
@@ -265,7 +265,7 @@ osd_pool_default_size = 1
 	}
 
 	logger.Infof("Starting Rook Cluster with yaml")
-	settings := &clusterSettings{h.clusterName, namespace, storeType, dataDirHostPath, mon.Count, 0, usePVC, storageClassName, skipOSDCreation, cephVersion}
+	settings := &clusterSettings{h.ClusterName, namespace, storeType, dataDirHostPath, mon.Count, 0, usePVC, storageClassName, skipOSDCreation, cephVersion}
 	rookCluster := h.Manifests.GetRookCluster(settings)
 	if _, err := h.k8shelper.KubectlWithStdin(rookCluster, createFromStdinArgs...); err != nil {
 		return fmt.Errorf("Failed to create rook cluster : %v ", err)
@@ -546,7 +546,7 @@ func (h *CephInstaller) UninstallRookFromMultipleNS(systemNamespace string, name
 			h.GatherAllRookLogs(h.T().Name()+"poolcheck", systemNamespace)
 		}
 
-		err = h.k8shelper.DeleteResourceAndWait(false, "-n", namespace, "cephcluster", h.clusterName)
+		err = h.k8shelper.DeleteResourceAndWait(false, "-n", namespace, "cephcluster", h.ClusterName)
 		checkError(h.T(), err, fmt.Sprintf("cannot remove cluster %s", namespace))
 
 		if h.cleanupHost {
@@ -561,7 +561,7 @@ func (h *CephInstaller) UninstallRookFromMultipleNS(systemNamespace string, name
 		_, err = h.k8shelper.KubectlWithStdin(roles, deleteFromStdinArgs...)
 
 		crdCheckerFunc := func() error {
-			_, err := h.k8shelper.RookClientset.CephV1().CephClusters(namespace).Get(h.clusterName, metav1.GetOptions{})
+			_, err := h.k8shelper.RookClientset.CephV1().CephClusters(namespace).Get(h.ClusterName, metav1.GetOptions{})
 			// ensure the finalizer(s) are removed
 			h.removeClusterFinalizers(namespace)
 			return err
@@ -676,7 +676,7 @@ func (h *CephInstaller) UninstallRookFromMultipleNS(systemNamespace string, name
 
 func (h *CephInstaller) removeClusterFinalizers(namespace string) {
 	// Get the latest cluster instead of using the same instance in case it has been changed
-	cluster, err := h.k8shelper.RookClientset.CephV1().CephClusters(namespace).Get(h.clusterName, metav1.GetOptions{})
+	cluster, err := h.k8shelper.RookClientset.CephV1().CephClusters(namespace).Get(h.ClusterName, metav1.GetOptions{})
 	if err != nil {
 		logger.Errorf("failed to remove finalizer. failed to get cluster. %+v", err)
 		return
@@ -696,7 +696,7 @@ func (h *CephInstaller) removeClusterFinalizers(namespace string) {
 }
 
 func (h *CephInstaller) checkCephHealthStatus(namespace string) {
-	clusterResource, err := h.k8shelper.RookClientset.CephV1().CephClusters(namespace).Get(h.clusterName, metav1.GetOptions{})
+	clusterResource, err := h.k8shelper.RookClientset.CephV1().CephClusters(namespace).Get(h.ClusterName, metav1.GetOptions{})
 	assert.Nil(h.T(), err)
 	clusterPhase := string(clusterResource.Status.Phase)
 	if clusterPhase != "Ready" && clusterPhase != "Connected" {
@@ -707,7 +707,7 @@ func (h *CephInstaller) checkCephHealthStatus(namespace string) {
 	// If needed, give it a few seconds to settle and check the status again.
 	if clusterResource.Status.CephStatus.Health != "HEALTH_OK" {
 		time.Sleep(10 * time.Second)
-		clusterResource, err = h.k8shelper.RookClientset.CephV1().CephClusters(namespace).Get(h.clusterName, metav1.GetOptions{})
+		clusterResource, err = h.k8shelper.RookClientset.CephV1().CephClusters(namespace).Get(h.ClusterName, metav1.GetOptions{})
 		assert.Nil(h.T(), err)
 	}
 
@@ -786,7 +786,7 @@ func NewCephInstaller(t func() *testing.T, clientset *kubernetes.Clientset, useH
 		k8shelper:       k8shelp,
 		helmHelper:      utils.NewHelmHelper(testHelmPath()),
 		useHelm:         useHelm,
-		clusterName:     clusterName,
+		ClusterName:     clusterName,
 		k8sVersion:      version.String(),
 		CephVersion:     cephVersion,
 		cleanupHost:     cleanupHost,
@@ -863,7 +863,7 @@ spec:
 }
 
 func (h *CephInstaller) addCleanupPolicy(namespace string) error {
-	cluster, err := h.k8shelper.RookClientset.CephV1().CephClusters(namespace).Get(h.clusterName, metav1.GetOptions{})
+	cluster, err := h.k8shelper.RookClientset.CephV1().CephClusters(namespace).Get(h.ClusterName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get ceph cluster. %+v", err)
 	}
