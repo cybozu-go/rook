@@ -4,6 +4,15 @@ function create_osd() {
   lsblk
   kubectl delete pv -l type=local-osd
 
+  if [ $device_type = lvm ] ; then
+    test_vg=rook-integration-test-vg
+    test_lv=rook-integration-test-lv
+    sudo pvcreate "${test_scratch_device}"
+    sudo vgcreate "${test_vg}" "${test_scratch_device}"
+    sudo lvcreate -l 100%FREE -n "${test_lv}" "${test_vg}"
+    test_device=/dev/"${test_vg}"/"${test_lv}"
+  fi
+
   cat <<eof | kubectl apply -f -
 apiVersion: v1
 kind: PersistentVolume
@@ -14,7 +23,7 @@ metadata:
 spec:
   storageClassName: manual
   capacity:
-    storage: 10Gi
+    storage: 9Gi
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
@@ -36,6 +45,11 @@ function delete_osd() {
   lsblk
   kubectl delete pv -l type=local-osd
 
+  if [ $device_type = lvm ] ; then
+    sudo vgremove --yes --force rook-integration-test-vg
+    sudo pvremove --yes --force ${test_scratch_device}
+  fi
+
   sudo dd if=/dev/zero of=${test_scratch_device} bs=1M count=100 oflag=dsync,direct
 }
 
@@ -54,7 +68,7 @@ fi
 device_type=$2
 test_device=${test_scratch_device}
 case "${device_type}" in
-  disk)
+  disk|lvm)
     ;;
   *)
     echo "invalid device type: '$2'" >&2

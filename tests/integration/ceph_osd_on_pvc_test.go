@@ -149,4 +149,12 @@ func (suite *OSDOnPVCSuite) TestCreatingOSDConfigurationOnPVC() {
 	// We have an OSD on raw-disk-backed PVC here
 	logger.Infof("Check if OSD on PVC backed by %q type device", sys.DiskType)
 	checkIfRookClusterIsInstalled(suite.Suite, suite.k8sh, installer.SystemNamespace(suite.namespace), suite.namespace, 1)
+
+	prevDeviceType := sys.DiskType
+	for _, deviceType := range []string{sys.LVMType} {
+		logger.Infof("Check if OSD on PVC backed by %q type device", deviceType)
+		suite.deleteOSD(prevDeviceType)
+		suite.createOSD(deviceType)
+		prevDeviceType = deviceType
+	}
 }

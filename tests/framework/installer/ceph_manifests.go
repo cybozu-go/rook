@@ -1907,7 +1907,7 @@ spec:
         spec:
           resources:
             requests:
-              storage: 10Gi
+              storage: 9Gi
           storageClassName: ` + settings.StorageClassName + `
           volumeMode: Block
           accessModes:
