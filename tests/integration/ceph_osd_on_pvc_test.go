@@ -85,7 +85,7 @@ func (suite *OSDOnPVCSuite) SetupSuite() {
 		storageClassName:        "manual",
 		useHelm:                 false,
 		usePVC:                  true,
-		mons:                    3,
+		mons:                    1,
 		rbdMirrorWorkers:        1,
 		rookCephCleanup:         true,
 		skipOSDCreation:         false,

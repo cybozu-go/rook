@@ -3,7 +3,7 @@
 lsblk
 
 sudo rm -rf /var/lib/rook/rook-integration-test
-sudo mkdir -p /var/lib/rook/rook-integration-test/mon1 /var/lib/rook/rook-integration-test/mon2 /var/lib/rook/rook-integration-test/mon3
+sudo mkdir -p /var/lib/rook/rook-integration-test/mon
 
 node_name=$(kubectl get nodes -o jsonpath={.items[*].metadata.name})
 
@@ -15,7 +15,7 @@ cat <<eof | kubectl apply -f -
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: local-mon1
+  name: local-mon
   labels:
     type: local-mon
 spec:
@@ -27,57 +27,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   volumeMode: Filesystem
   local:
-    path: "/var/lib/rook/rook-integration-test/mon1"
-  nodeAffinity:
-      required:
-        nodeSelectorTerms:
-          - matchExpressions:
-              - key: rook.io/has-disk
-                operator: In
-                values:
-                - "true"
----
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: local-mon2
-  labels:
-    type: local-mon
-spec:
-  storageClassName: manual 
-  capacity:
-    storage: 5Gi
-  accessModes:
-    - ReadWriteOnce 
-  persistentVolumeReclaimPolicy: Retain
-  volumeMode: Filesystem
-  local:
-    path: "/var/lib/rook/rook-integration-test/mon2"
-  nodeAffinity:
-      required:
-        nodeSelectorTerms:
-          - matchExpressions:
-              - key: rook.io/has-disk
-                operator: In
-                values:
-                - "true"
----
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: local-mon3
-  labels:
-    type: local-mon
-spec:
-  storageClassName: manual 
-  capacity:
-    storage: 5Gi
-  accessModes:
-    - ReadWriteOnce 
-  persistentVolumeReclaimPolicy: Retain
-  volumeMode: Filesystem
-  local:
-    path: "/var/lib/rook/rook-integration-test/mon3"
+    path: "/var/lib/rook/rook-integration-test/mon"
   nodeAffinity:
       required:
         nodeSelectorTerms:
