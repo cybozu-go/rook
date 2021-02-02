@@ -229,6 +229,160 @@ kubectl -n rook-ceph scale deployment rook-ceph-operator --replicas=1
 
 The operator will automatically add more mons to increase the quorum size again, depending on the `mon.count`.
 
+
+## Recovering Mon Quorum using OSDs
+
+If all MONs fail, we can recover monitor store from OSDs. The steps in this section are based on the following URL.
+It is also that known limitations described in the ceph document exist, please read it before and carry out the work carefully.
+https://docs.ceph.com/en/latest/rados/troubleshooting/troubleshooting-mon/#recovery-using-osds
+
+
+**NOTE**: Some settings in the mgr and ceph cluster can not be restored.
+
+### Prerequisites
+
+1. OSDs are not corrupted.
+2. The [rook-ceph-tools pod](./ceph-toolbox.md) is deployed in the target cluster's namespace.
+
+### Set variables related to the environment
+
+```console
+FSID="<The value after --fsid is written in the mon deployment manifest.>"
+NAMESPACE="<Ceph cluster's namespace>"
+BACKUP_DIR=./backup
+MON_STORE=/tmp/mon-store
+
+OSDS=$(kubectl get deployment -n ${NAMESPACE} -l app=rook-ceph-osd -o json | jq -r '.items[].metadata.name')
+MONS=$(kubectl get deployment -n ${NAMESPACE} -l app=rook-ceph-mon -o json | jq -r '.items[].metadata.name')
+TOOL_DEPLOYMENT=$(kubectl get deployment -n ${NAMESPACE} -l app=rook-ceph-tools -o json | jq -r '.items[0].metadata.name')
+```
+
+### Take the backup of OSD/MON/toolbox manifests to BACKUP_DIR
+
+```console
+mkdir -p ${BACKUP_DIR}
+for mon in ${MONS}; do
+    kubectl -n ${NAMESPACE} get deployment $mon -o yaml > ${BACKUP_DIR}/$mon.yaml
+done
+
+for osd in ${OSDS}; do
+    kubectl -n ${NAMESPACE} get deployment $osd -o yaml > ${BACKUP_DIR}/$osd.yaml
+done
+
+kubectl -n ${NAMESPACE} get deployment ${TOOL_DEPLOYMENT} -o yaml > ${BACKUP_DIR}/${TOOL_DEPLOYMENT}.yaml
+```
+
+### Stop the operator, mons, and OSDs
+
+```console
+kubectl -n ${NAMESPACE} scale deployment rook-ceph-operator --replicas=0
+
+for mon in ${MONS}; do
+    kubectl -n ${NAMESPACE} patch deployment $mon -p '{"spec": {"template": {"spec": {"containers": [{"name": "mon", "command": ["sleep", "infinity"], "args": []}]}}}}'
+    kubectl -n ${NAMESPACE} patch deployment $mon --type=json --patch='[{"op":"remove", "path":"/spec/template/spec/containers/0/livenessProbe"}]'
+done
+
+for osd in ${OSDS}; do
+    kubectl -n ${NAMESPACE} patch deployment $osd -p '{"spec": {"template": {"spec": {"containers": [{"name": "osd", "command": ["sleep", "infinity"], "args": []}]}}}}'
+    kubectl -n ${NAMESPACE} patch deployment $osd --type=json --patch='[{"op":"remove", "path":"/spec/template/spec/containers/0/livenessProbe"}]'
+done
+```
+
+### Add mons-keyring to run the subsequent steps from toolbox
+
+```console
+kubectl -n ${NAMESPACE} patch deployment ${TOOL_DEPLOYMENT} --type=json \
+ --patch='[
+     {"op":"add", "path":"/spec/template/spec/volumes/-", "value": {"name": "mons-keyring", "secret": {"secretName": "rook-ceph-mons-keyring"}}},
+     {"op":"add", "path":"/spec/template/spec/containers/0/volumeMounts/-", "value": {"name": "mons-keyring", "mountPath": "/keyrings"}}
+ ]'
+
+# Wait until Pods are recreated.
+kubectl get po -n ${NAMESPACE} -w
+```
+
+### Gather the information needed to re-generate the monitor store
+
+```console
+rm -rf ${MON_STORE}
+mkdir ${MON_STORE}
+
+OSD_IDS=$(kubectl get -n ${NAMESPACE} po -l app=rook-ceph-osd -o json | jq -r '.items[].metadata.labels["osd"]')
+
+for i in ${OSD_IDS}; do
+    echo "Gather information from OSD $i"
+    name=$(kubectl get -n ${NAMESPACE} po -l app=rook-ceph-osd -l osd=${i} -o json | jq -r '.items[].metadata.name')
+    kubectl exec -i -n ${NAMESPACE} ${name} -- rm -rf ${MON_STORE}
+    kubectl exec -i -n ${NAMESPACE} ${name} -- mkdir ${MON_STORE}
+    tar cf - -C ${MON_STORE} . | kubectl exec -i -n ${NAMESPACE} ${name} -- tar xf - -C ${MON_STORE}
+    kubectl exec -i -n ${NAMESPACE} ${name} -- ceph-objectstore-tool --data-path /var/lib/ceph/osd/ceph-${i} --no-mon-config --op update-mon-db --mon-store-path ${MON_STORE}
+    rm -rf ${MON_STORE}/*
+    kubectl exec -i -n ${NAMESPACE} ${name} -- tar cf - -C ${MON_STORE} . | tar xf - -C ${MON_STORE}
+done
+```
+### Re-generate the monitor store
+
+```console
+# MON_IDS should be sorted by IP addresses due to the limitation of ceph-monstore-tool.
+MON_IDS=$(kubectl get svc -n ${NAMESPACE} -l app=rook-ceph-mon -o json | jq -r '.items[] | [.metadata.name, .spec.clusterIP] | @sh' | tr -d \' |  sort -t . -k 2,2n -k 3,3n -k 4,4n | cut -d' ' -f1 |  cut -d'-' -f4)
+TOOL=$(kubectl get -n ${NAMESPACE} po -l app=rook-ceph-tools -o json | jq -r '.items[0].metadata.name')
+
+kubectl exec -i -n ${NAMESPACE} ${TOOL} -- rm -rf ${MON_STORE}
+kubectl exec -i -n ${NAMESPACE} ${TOOL} -- mkdir ${MON_STORE}
+tar cf - -C ${MON_STORE} . | kubectl exec -i -n ${NAMESPACE} ${TOOL} -- tar xf - -C ${MON_STORE}
+kubectl exec -i -n ${NAMESPACE} ${TOOL} -- ceph-monstore-tool --fsid=${FSID} ${MON_STORE} rebuild -- --keyring /keyrings/keyring --mon-ids ${MON_IDS}
+rm -rf ${MON_STORE}
+mkdir ${MON_STORE}
+kubectl exec -i -n ${NAMESPACE} ${TOOL} -- tar cf - -C ${MON_STORE} . | tar xf - -C ${MON_STORE}
+```
+
+### Distribute the generated monitor store to mons
+
+```console
+for i in ${MON_IDS}; do
+    echo "Distribute monitor store to mon $i"
+    name=$(kubectl get -n ${NAMESPACE} po -l app=rook-ceph-mon -l mon=${i} -o json | jq -r '.items[].metadata.name')
+    STORE_DB=/var/lib/ceph/mon/ceph-${i}/store.db
+    kubectl exec -i -n ${NAMESPACE} ${name} -- rm -rf ${STORE_DB}.corrupted
+    kubectl exec -i -n ${NAMESPACE} ${name} -- mv ${STORE_DB} ${STORE_DB}.corrupted
+    kubectl exec -i -n ${NAMESPACE} ${name} -- mkdir ${STORE_DB}
+    tar cf - -C ${MON_STORE}/store.db . | kubectl exec -i -n ${NAMESPACE} ${name} -- tar xf - -C ${STORE_DB}
+    kubectl exec -i -n ${NAMESPACE} ${name} -- chown -R ceph:ceph ${STORE_DB}
+done
+```
+
+### Restore deployments
+
+```console
+for mon in ${MONS}; do
+    kubectl replace --force -f ${BACKUP_DIR}/$mon.yaml
+done
+
+for osd in ${OSDS}; do
+    kubectl replace --force -f ${BACKUP_DIR}/$osd.yaml
+done
+
+kubectl replace --force -f ${BACKUP_DIR}/${TOOL_DEPLOYMENT}.yaml
+
+# Wait until Pods are recreated
+kubectl get po -n ${NAMESPACE} -w
+```
+
+### Restore operator and recreate mgr
+
+```console
+TOOL=$(kubectl get -n ${NAMESPACE} po -l app=rook-ceph-tools -o json | jq -r '.items[0].metadata.name')
+
+kubectl exec -i -n ${NAMESPACE} ${TOOL} -- ceph mon enable-msgr2
+
+kubectl -n ${NAMESPACE} scale deployment rook-ceph-operator --replicas=1
+
+kubectl -n ${NAMESPACE} delete pod -l app=rook-ceph-mgr
+
+# Check if cluster becomes healthy.
+kubectl exec -n ${NAMESPACE} ${TOOL} -- ceph -s
+```
+
 # Adopt an existing Rook Ceph cluster into a new Kubernetes cluster
 
 ## Situations this section can help resolve
@@ -354,4 +508,3 @@ and deleting the other deployments. An example command to do this is `k -n rook-
 1. Copy the endpoints configmap from the old cluster: `rook-ceph-mon-endpoints`
 1. Scale the rook operator up again : `kubectl -n rook-ceph scale deployment rook-ceph-operator --replicas 1`
 1. Wait until the reconciliation is over.
-
