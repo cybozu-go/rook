@@ -175,7 +175,7 @@ func (c *Cluster) createSelfSignedCert() (bool, error) {
 
 	// retry a few times in the case that the mgr module is not ready to accept commands
 	for i := 0; i < 5; i++ {
-		_, err := client.NewCephCommand(c.context, c.clusterInfo, args).RunWithTimeout(client.CephCommandTimeout)
+		_, err := client.NewCephCommand(c.context, c.clusterInfo, args).RunWithTimeout(time.Duration(c.clusterInfo.CephCommandTimeout) * time.Second)
 		if err == context.DeadlineExceeded {
 			logger.Warning("cert creation timed out. trying again")
 			continue
@@ -249,7 +249,7 @@ func (c *Cluster) setLoginCredentials(password string) error {
 	}
 
 	_, err := client.ExecuteCephCommandWithRetry(func() (string, []byte, error) {
-		output, err := client.NewCephCommand(c.context, c.clusterInfo, args).RunWithTimeout(client.CephCommandTimeout)
+		output, err := client.NewCephCommand(c.context, c.clusterInfo, args).RunWithTimeout(time.Duration(c.clusterInfo.CephCommandTimeout) * time.Second)
 		return "set dashboard creds", output, err
 	}, c.exitCode, 5, invalidArgErrorCode, dashboardInitWaitTime)
 	if err != nil {

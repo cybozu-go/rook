@@ -41,8 +41,8 @@ const (
 	// Kubectl is the name of the CLI tool for 'kubectl'
 	Kubectl = "kubectl"
 	// CrushTool is the name of the CLI tool for 'crushtool'
-	CrushTool          = "crushtool"
-	CephCommandTimeout = 15 * time.Second
+	CrushTool                 = "crushtool"
+	defaultCephCommandTimeout = 15 // in seconds
 	// DefaultPGCount will cause Ceph to use the internal default PG count
 	DefaultPGCount = "0"
 )
@@ -51,6 +51,13 @@ const (
 func CephConfFilePath(configDir, clusterName string) string {
 	confFile := fmt.Sprintf("%s.config", clusterName)
 	return path.Join(configDir, clusterName, confFile)
+}
+
+func GetCephCommandTimeout(value int) int {
+	if value != 0 {
+		return value
+	}
+	return defaultCephCommandTimeout
 }
 
 // FinalizeCephCommandArgs builds the command line to be called
@@ -62,7 +69,7 @@ func FinalizeCephCommandArgs(command string, clusterInfo *ClusterInfo, args []st
 
 	// we could use a slice and iterate over it but since we have only 3 elements
 	// I don't think this is worth a loop
-	timeout := strconv.Itoa(int(CephCommandTimeout.Seconds()))
+	timeout := strconv.Itoa(clusterInfo.CephCommandTimeout)
 	if command != "rbd" && command != "crushtool" && command != "radosgw-admin" {
 		args = append(args, "--connect-timeout="+timeout)
 	}
@@ -173,8 +180,8 @@ func (c *CephToolCommand) RunWithTimeout(timeout time.Duration) ([]byte, error) 
 // minute. This method is left as a special case in which the caller has fully
 // configured its arguments. It is future work to integrate this case into the
 // generalization.
-func ExecuteRBDCommandWithTimeout(context *clusterd.Context, args []string) (string, error) {
-	output, err := context.Executor.ExecuteCommandWithTimeout(CephCommandTimeout, RBDTool, args...)
+func ExecuteRBDCommandWithTimeout(context *clusterd.Context, timeout int, args []string) (string, error) {
+	output, err := context.Executor.ExecuteCommandWithTimeout(time.Duration(timeout)*time.Second, RBDTool, args...)
 	return output, err
 }
 

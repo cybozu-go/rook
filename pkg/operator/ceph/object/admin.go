@@ -19,6 +19,7 @@ package object
 import (
 	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/pkg/errors"
 	cephv1 "github.com/rook/rook/pkg/apis/ceph.rook.io/v1"
@@ -74,7 +75,9 @@ func RunAdminCommandNoMultisite(c *Context, expectJSON bool, args ...string) (st
 	command, args := client.FinalizeCephCommandArgs("radosgw-admin", c.clusterInfo, args, c.Context.ConfigDir)
 
 	// start the rgw admin command
-	output, err := c.Context.Executor.ExecuteCommandWithTimeout(client.CephCommandTimeout, command, args...)
+	timeout := time.Duration(c.clusterInfo.CephCommandTimeout) + time.Second
+
+	output, err := c.Context.Executor.ExecuteCommandWithTimeout(timeout, command, args...)
 	if err != nil {
 		return output, err
 	}

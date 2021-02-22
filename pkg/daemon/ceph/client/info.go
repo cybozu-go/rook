@@ -43,8 +43,9 @@ type ClusterInfo struct {
 	OwnerInfo     *k8sutil.OwnerInfo
 	// Hide the name of the cluster since in 99% of uses we want to use the cluster namespace.
 	// If the CR name is needed, access it through the NamespacedName() method.
-	name              string
-	OsdUpgradeTimeout time.Duration
+	name               string
+	OsdUpgradeTimeout  time.Duration
+	CephCommandTimeout int
 }
 
 // MonInfo is a collection of information about a Ceph mon.
@@ -77,7 +78,7 @@ func (c *ClusterInfo) NamespacedName() types.NamespacedName {
 }
 
 // AdminClusterInfo() creates a ClusterInfo with the basic info to access the cluster
-// as an admin. Only the namespace and the ceph username fields are set in the struct,
+// as an admin. Only a few fields are set in the struct,
 // so this clusterInfo cannot be used to generate the mon config or request the
 // namespacedName. A full cluster info must be populated for those operations.
 func AdminClusterInfo(namespace string) *ClusterInfo {
@@ -87,8 +88,9 @@ func AdminClusterInfo(namespace string) *ClusterInfo {
 		CephCred: CephCred{
 			Username: AdminUsername,
 		},
-		name:      "testing",
-		OwnerInfo: ownerInfo,
+		name:               "testing",
+		OwnerInfo:          ownerInfo,
+		CephCommandTimeout: defaultCephCommandTimeout,
 	}
 }
 

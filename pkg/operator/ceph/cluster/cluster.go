@@ -189,6 +189,7 @@ func (c *ClusterController) initializeCluster(cluster *cluster, clusterObj *ceph
 		clusterInfo.SetName(c.namespacedName.Name)
 		cluster.ClusterInfo = clusterInfo
 	}
+	clusterInfo.CephCommandTimeout = client.GetCephCommandTimeout(cluster.Spec.WaitTimeoutForCephCommandInSeconds)
 
 	// Depending on the cluster type choose the correct orchestation
 	if cluster.Spec.External.Enable {

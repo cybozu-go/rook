@@ -68,6 +68,8 @@ spec:
               type: boolean
             waitTimeoutForHealthyOSDInMinutes:
               type: integer
+            waitTimeoutForCephCommandInSeconds:
+              type: integer
             mon:
               properties:
                 allowMultiplePerNode:

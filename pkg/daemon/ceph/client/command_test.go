@@ -17,7 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,7 +29,7 @@ func TestFinalizeCephCommandArgs(t *testing.T) {
 	args := []string{"quorum_status"}
 	expectedArgs := []string{
 		"quorum_status",
-		"--connect-timeout=" + strconv.Itoa(int(CephCommandTimeout.Seconds())),
+		"--connect-timeout=15",
 		"--cluster=rook",
 		"--conf=/var/lib/rook/rook-ceph/rook/rook.config",
 		"--name=client.admin",
@@ -97,4 +96,11 @@ func TestFinalizeCephCommandArgsToolBox(t *testing.T) {
 	assert.Exactly(t, "kubectl", cmd)
 	assert.Exactly(t, expectedArgs, args)
 	RunAllCephCommandsInToolboxPod = ""
+}
+
+func TestGetCephCommandTimeout(t *testing.T) {
+	timeout := GetCephCommandTimeout(0)
+	assert.Equal(t, defaultCephCommandTimeout, timeout)
+	timeout = GetCephCommandTimeout(100)
+	assert.Equal(t, 100, timeout)
 }

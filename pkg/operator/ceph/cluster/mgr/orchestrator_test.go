@@ -57,7 +57,8 @@ func TestOrchestratorModules(t *testing.T) {
 	}
 
 	clusterInfo := &cephclient.ClusterInfo{
-		CephVersion: cephver.Nautilus,
+		CephVersion:        cephver.Nautilus,
+		CephCommandTimeout: 15,
 	}
 
 	c := &Cluster{clusterInfo: clusterInfo, context: context}

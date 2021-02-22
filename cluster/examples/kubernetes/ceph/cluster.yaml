@@ -43,6 +43,8 @@ spec:
   # continue with the upgrade of an OSD even if its not ok to stop after the timeout. This timeout won't be applied if `skipUpgradeChecks` is `true`.
   # The default wait timeout is 10 minutes.
   waitTimeoutForHealthyOSDInMinutes: 10
+  # waitTimeoutForCephCommandInSeconds defines the timeout (in seconds) of Ceph CLI commands
+  waitTimeoutForCephCommandInSeconds: 15
   mon:
     # Set the number of mons to be started. Must be an odd number, and is generally recommended to be 3.
     count: 3

@@ -157,6 +157,9 @@ type ClusterSpec struct {
 	// +optional
 	WaitTimeoutForHealthyOSDInMinutes time.Duration `json:"waitTimeoutForHealthyOSDInMinutes,omitempty"`
 
+	// waitTimeoutForCephCommandInSeconds defines the timeout (in seconds) of Ceph CLI commands
+	WaitTimeoutForCephCommandInSeconds int `json:"waitTimeoutForCephCommandInSeconds,omitempty"`
+
 	// A spec for configuring disruption management.
 	// +nullable
 	// +optional

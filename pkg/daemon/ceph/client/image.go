@@ -140,7 +140,7 @@ func ExpandImage(context *clusterd.Context, clusterInfo *ClusterInfo, name, pool
 		fmt.Sprintf("--keyring=%s", keyring),
 		"-m", monitors,
 	}
-	output, err := ExecuteRBDCommandWithTimeout(context, args)
+	output, err := ExecuteRBDCommandWithTimeout(context, clusterInfo.CephCommandTimeout, args)
 	if err != nil {
 		return errors.Wrapf(err, "failed to resize image %s in pool %s, output: %s", name, poolName, string(output))
 	}
@@ -160,7 +160,7 @@ func MapImage(context *clusterd.Context, clusterInfo *ClusterInfo, imageName, po
 		"--conf=/dev/null", // no config file needed because we are passing all required config as arguments
 	}
 
-	output, err := ExecuteRBDCommandWithTimeout(context, args)
+	output, err := ExecuteRBDCommandWithTimeout(context, clusterInfo.CephCommandTimeout, args)
 	if err != nil {
 		return errors.Wrapf(err, "failed to map image %s, output: %s", imageSpec, output)
 	}
@@ -185,7 +185,7 @@ func UnMapImage(context *clusterd.Context, clusterInfo *ClusterInfo, imageName, 
 		args = append(args, "-o", "force")
 	}
 
-	output, err := ExecuteRBDCommandWithTimeout(context, args)
+	output, err := ExecuteRBDCommandWithTimeout(context, clusterInfo.CephCommandTimeout, args)
 	if err != nil {
 		return errors.Wrapf(err, "failed to unmap image %s, output: %s", deviceImage, output)
 	}
