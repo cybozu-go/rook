@@ -45,12 +45,88 @@ spec:
 ## PVC-based Cluster
 
 In a "PVC-based cluster", the Ceph persistent data is stored on volumes requested from a storage class of your choice.
-This type of cluster is recommended in a cloud environment where volumes can be dynamically created and also
+This type of cluster is recommended to use with CSI drivers which support dynamic volume provisioning and also in clusters where a local PV provisioner is available.
 in clusters where a local PV provisioner is available.
 
 > **NOTE**: Kubernetes version 1.13.0 or greater is required to provision OSDs on PVCs.
 
 ```yaml
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: local0
+spec:
+  storageClassName: local-storage
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  volumeMode: Block
+  local:
+    path: /dev/sdb
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - host0
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: local1
+spec:
+  storageClassName: local-storage
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  volumeMode: Block
+  local:
+    path: /dev/sdb
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - host1
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: local2
+spec:
+  storageClassName: local-storage
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  volumeMode: Block
+  local:
+    path: /dev/sdb
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - host2
+---
 apiVersion: ceph.rook.io/v1
 kind: CephCluster
 metadata:
@@ -89,6 +165,8 @@ spec:
           accessModes:
             - ReadWriteOnce
 ```
+
+If you want to use dm devices like logical volume, please replace `/dev/sdb` with their device names like `/dev/vg-name/lv-name`.
 
 For a more advanced scenario, such as adding a dedicated device you can refer to the [dedicated metadata device for OSD on PVC section](#dedicated-metadata-and-wal-device-for-osd-on-pvc).
 
@@ -404,7 +482,7 @@ This feature is only available when `useAllNodes` has been set to `false`.
 
 ### Storage Selection Settings
 
-Below are the settings available, both at the cluster and individual node level, for selecting which storage resources will be included in the cluster.
+Below are the settings for host-based cluster. This type of cluster can specify devices for OSDs, both at the cluster and individual node level, for selecting which storage resources will be included in the cluster.
 
 * `useAllDevices`: `true` or `false`, indicating whether all devices found on nodes in the cluster should be automatically consumed by OSDs. **Not recommended** unless you have a very controlled environment where you will not risk formatting of devices with existing data. When `true`, all devices/partitions will be used. Is overridden by `deviceFilter` if specified.
 * `deviceFilter`: A regular expression for short kernel names of devices (e.g. `sda`) that allows selection of devices to be consumed by OSDs.  If individual devices have been specified for a node then this filter will be ignored.  This field uses [golang regular expression syntax](https://golang.org/pkg/regexp/syntax/). For example:
@@ -419,6 +497,11 @@ Below are the settings available, both at the cluster and individual node level,
 * `devices`: A list of individual device names belonging to this node to include in the storage cluster.
   * `name`: The name of the device (e.g., `sda`), or full udev path (e.g. `/dev/disk/by-id/ata-ST4000DM004-XXXX` - this will not change after reboots).
   * `config`: Device-specific config settings. See the [config settings](#osd-configuration-settings) below
+
+Host-based cluster only supports raw device and partition.
+
+And below is the settings for PVC-based cluster.
+
 * `storageClassDeviceSets`: Explained in [Storage Class Device Sets](#storage-class-device-sets)
 
 ### Storage Class Device Sets
