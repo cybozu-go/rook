@@ -120,6 +120,7 @@ func (s *UpgradeSuite) TestUpgradeRookToMaster() {
 	//
 	logger.Infof("*** UPGRADING ROOK FROM %s to master ***", installer.Version1_6)
 	s.gatherLogs(s.settings.OperatorNamespace, "_before_master_upgrade")
+	s.upgradeToTheLatestStable()
 	s.upgradeToMaster()
 
 	s.verifyOperatorImage(installer.LocalBuildTag)
@@ -408,7 +409,24 @@ func (s *UpgradeSuite) verifyFilesAfterUpgrade(fsName, newFileToWrite, messageFo
 	}
 }
 
-// UpgradeToMaster performs the steps necessary to upgrade a Rook v1.4 cluster to master. It does not
+// UpgradeToTheLatestStable performs the steps necessary to upgrade a Rook v1.6 cluster to the latest v1.7. It does not
+// verify the upgrade but merely starts the upgrade process.
+func (s *UpgradeSuite) upgradeToTheLatestStable() {
+	// Apply the CRDs for the latest master
+	s.settings.RookVersion = installer.LocalBuildTag
+	m := installer.NewCephManifests(s.settings)
+	require.NoError(s.T(), s.k8sh.ResourceOperation("apply", m.GetCRDs(s.k8sh)))
+
+	require.NoError(s.T(), s.k8sh.ResourceOperation("apply", m.GetCommon()))
+
+	require.NoError(s.T(),
+		s.k8sh.SetDeploymentVersion(s.settings.OperatorNamespace, operatorContainer, operatorContainer, installer.LocalBuildTag))
+
+	require.NoError(s.T(),
+		s.k8sh.SetDeploymentVersion(s.settings.Namespace, "rook-ceph-tools", "rook-ceph-tools", installer.LocalBuildTag))
+}
+
+// UpgradeToMaster performs the steps necessary to upgrade a Rook v1.6 cluster to master. It does not
 // verify the upgrade but merely starts the upgrade process.
 func (s *UpgradeSuite) upgradeToMaster() {
 	// Apply the CRDs for the latest master
