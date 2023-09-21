@@ -428,6 +428,16 @@ Below are the settings for a PVC-based cluster.
 
 * `storageClassDeviceSets`: Explained in [Storage Class Device Sets](#storage-class-device-sets)
 
+Here is supported device types backed by OSDs.
+
+|type|supported|note|
+|:---|:---|:---|
+|disk|yes|unsure|
+|part|yes|If `encrypted` is `true`, `osdsPerDevice` should be 1|
+|crypt|yes|unsure|
+|lvm|yes|`encrypted` should be `false`` and `osdsPerDevice` should be 1|
+|loop|yes|`` in `` cm should be `true`|
+
 ### Storage Class Device Sets
 
 The following are the settings for Storage Class Device Sets which can be configured to create OSDs that are backed by block mode PVs.
@@ -462,6 +472,15 @@ The following are the settings for Storage Class Device Sets which can be config
     * `accessModes`: The access mode for the PVC to be bound by OSD.
 * `schedulerName`: Scheduler name for OSD pod placement. (Optional)
 * `encrypted`: whether to encrypt all the OSDs in a given storageClassDeviceSet
+
+|type|supported|note|
+|:---|:---|:---|
+|disk|yes||
+|part|yes|If `encrypted` is `true`, `osdsPerDevice` should be 1|
+|crypt|yes||
+|lvm|yes|`encrypted` should be `false`|
+|mpath|yes|unsure|
+|loop|yes|`` in `operator` cm should be `true`|
 
 ### OSD Configuration Settings
 
