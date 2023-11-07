@@ -592,6 +592,18 @@ func (c *Cluster) makeDeployment(osdProps osdProperties, osd OSDInfo, provisionC
 		volumes = append(volumes, activateOSDVolume...)
 		volumeMounts = append(volumeMounts, activateOSDContainer.VolumeMounts[0])
 		initContainers = append(initContainers, *activateOSDContainer)
+		/* sat TBD
+		if osdProps.encrypted && osd.CVMode == "raw" {
+			// Open the encrypted disk
+			initContainers = append(initContainers, c.getEncryptionOpenInitContainerActivate(osdDataDirPath, osdProps)...)
+			// Copy the encrypted block to the osd data location, e,g: /var/lib/ceph/osd/ceph-0/block
+			initContainers = append(initContainers, c.getEncryptionInitContainerActivate(osdDataDirPath, osdProps)...)
+			// Print the encrypted block status
+			initContainers = append(initContainers, c.getEncryptedStatusInitContainer(osdDataDirPath, osdProps))
+			// Resize the encrypted device if necessary, this must be done after the encrypted block is opened
+			initContainers = append(initContainers, c.getExpandEncryptedInitContainer(osdDataDirPath, osdProps))
+		}
+		*/
 		initContainers = append(initContainers, c.getExpandInitContainer(osdProps, c.spec.DataDirHostPath, c.clusterInfo.Namespace, osdID, osd))
 	}
 

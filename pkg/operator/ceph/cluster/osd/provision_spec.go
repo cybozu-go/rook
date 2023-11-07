@@ -291,18 +291,24 @@ func (c *Cluster) provisionOSDContainer(osdProps osdProperties, copyBinariesMoun
 				}
 				envVars = append(envVars, kms.ConfigToEnvVar(c.spec)...)
 				if c.spec.Security.KeyManagementService.IsKMIPKMS() {
-					envVars = append(envVars, cephVolumeRawEncryptedEnvVarFromSecret(osdProps))
+					envVars = append(envVars, cephVolumeRawEncryptedEnvVarFromSecretPVC(osdProps))
 					_, volmeMountsKMIP := kms.KMIPVolumeAndMount(c.spec.Security.KeyManagementService.TokenSecretName)
 					volumeMounts = append(volumeMounts, volmeMountsKMIP)
 				}
 			} else {
-				envVars = append(envVars, cephVolumeRawEncryptedEnvVarFromSecret(osdProps))
+				envVars = append(envVars, cephVolumeRawEncryptedEnvVarFromSecretPVC(osdProps))
 			}
 		}
 	} else {
+		logger.Errorf("sat: hahaha!")
 		// If not running on PVC we mount the rootfs of the host to validate the presence of the LVM package
 		volumeMounts = append(volumeMounts, v1.VolumeMount{Name: "rootfs", MountPath: "/rootfs", ReadOnly: true})
+		if osdProps.storeConfig.EncryptedDevice {
+			logger.Errorf("sat: %v", cephVolumeRawEncryptedEnvVarFromSecret(osdProps.crushHostname))
+			envVars = append(envVars, cephVolumeRawEncryptedEnvVarFromSecret(osdProps.crushHostname))
+		}
 	}
+	logger.Errorf("sat: UHUHU!")
 
 	// Add OSD ID as environment variables.
 	// When this env is set, prepare pod job will destroy this OSD.

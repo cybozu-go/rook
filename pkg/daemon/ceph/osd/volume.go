@@ -535,6 +535,9 @@ func (a *OsdAgent) initializeDevicesRawMode(context *clusterd.Context, devices *
 	storeFlag := a.storeConfig.GetStoreFlag()
 
 	baseArgs := []string{"-oL", cephVolumeCmd, cephVolumeMode, "prepare", storeFlag}
+	if a.storeConfig.EncryptedDevice {
+		baseArgs = append(baseArgs, encryptedFlag)
+	}
 
 	for name, device := range devices.Entries {
 		deviceArg := path.Join("/dev", name)

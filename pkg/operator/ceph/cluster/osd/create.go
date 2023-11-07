@@ -333,6 +333,27 @@ func (c *Cluster) startProvisioningOverNodes(config *provisionConfig, errs *prov
 			metadataDevice: metadataDevice,
 		}
 
+		// create encryption Kubernetes Secret
+		key, err := GenerateDmCryptKey()
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to generate dmcrypt key for node %q. %v", node.Name, err)
+			errs.addError(errMsg)
+			continue
+		}
+
+		// Initialize the KMS code
+		kmsConfig := kms.NewConfig(c.context, &c.spec, c.clusterInfo)
+
+		// Generate and store the encrypted key in whatever KMS is configured
+		// The PutSecret() call for each backend verifies whether the key is present already so
+		// no risk of overwriting an existing key.
+		err = kmsConfig.PutSecret(node.Name, key)
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to store secret. %v", err)
+			errs.addError(errMsg)
+			continue
+		}
+
 		// update the orchestration status of this node to the starting state
 		status := OrchestrationStatus{Status: OrchestrationStatusStarting}
 		cmName := c.updateOSDStatus(n.Name, status)

@@ -191,13 +191,27 @@ func pvcNameEnvVar(pvcName string) v1.EnvVar {
 	return v1.EnvVar{Name: PVCNameEnvVarName, Value: pvcName}
 }
 
-func cephVolumeRawEncryptedEnvVarFromSecret(osdProps osdProperties) v1.EnvVar {
+func cephVolumeRawEncryptedEnvVarFromSecretPVC(osdProps osdProperties) v1.EnvVar {
 	return v1.EnvVar{
 		Name: CephVolumeEncryptedKeyEnvVarName,
 		ValueFrom: &v1.EnvVarSource{
 			SecretKeyRef: &v1.SecretKeySelector{
 				LocalObjectReference: v1.LocalObjectReference{
 					Name: kms.GenerateOSDEncryptionSecretName(osdProps.pvc.ClaimName),
+				},
+				Key: kms.OsdEncryptionSecretNameKeyName,
+			},
+		},
+	}
+}
+
+func cephVolumeRawEncryptedEnvVarFromSecret(nodeName string) v1.EnvVar {
+	return v1.EnvVar{
+		Name: CephVolumeEncryptedKeyEnvVarName,
+		ValueFrom: &v1.EnvVarSource{
+			SecretKeyRef: &v1.SecretKeySelector{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: kms.GenerateOSDEncryptionSecretName(nodeName),
 				},
 				Key: kms.OsdEncryptionSecretNameKeyName,
 			},
