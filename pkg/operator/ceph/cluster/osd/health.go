@@ -99,7 +99,7 @@ func (m *OSDHealthMonitor) Update(removeOSDsIfOUTAndSafeToRemove bool) {
 func (m *OSDHealthMonitor) checkOSDHealth() {
 	err := m.checkOSDDump()
 	if err != nil {
-		log.NamespacedDebug(m.clusterInfo.Namespace, logger, "failed to check OSD Dump. %v", err)
+		log.NamespacedDebug(m.clusterInfo.Namespace, logger, "failed to check OSD Dump . %v", err)
 	}
 }
 
